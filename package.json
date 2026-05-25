@@ -1,0 +1,28 @@
+{
+  "name": "neverlate",
+  "version": "0.0.0",
+  "private": true,
+    "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "description": "NeverLate is an AI assistant that connects scattered personal information sources (email, calendar, notes, documents, tasks, etc.), understands them through a unified data layer using Coral, and proactively surfaces important things users are likely to miss before they become problems.",
+  "homepage": "https://github.com/GPramodh07/Coral-Beans-2026#readme",
+  "bugs": {
+    "url": "https://github.com/GPramodh07/Coral-Beans-2026/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GPramodh07/Coral-Beans-2026.git"
+  },
+  "license": "MIT",
+  "author": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev:web": "npm run dev -w @neverlate/web",
+    "dev:server": "npm run dev -w @neverlate/server",
+    "dev": "concurrently \"npm run dev:web\" \"npm run dev:server\"",
+    "build": "npm run build --workspaces"
+  }
+}

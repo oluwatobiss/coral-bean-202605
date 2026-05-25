@@ -1,0 +1,6 @@
+{
+  "name": "@neverlate/server",
+  "scripts": {
+    "dev": "tsx watch src/index.ts"
+  }
+}
