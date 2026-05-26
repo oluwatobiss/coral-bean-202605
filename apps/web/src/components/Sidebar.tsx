@@ -12,7 +12,7 @@ export default function Sidebar({ activePage, setActivePage, isDark }: SidebarPr
     { id: 'events', label: 'Agenda / Events', icon: 'calendar_today' },
     { id: 'reminders', label: 'Reminders', icon: 'notifications_active' },
     { id: 'actions', label: 'Actions', icon: 'bolt' },
-    { id: 'chat', label: 'AI Chat', icon: 'chat_spark' },
+    { id: 'chat', label: 'AI Chat', icon: 'chat_bubble' },
     { id: 'insights', label: 'Insights', icon: 'insights' },
     { id: 'sources', label: 'Sources', icon: 'database' },
     { id: 'settings', label: 'Settings', icon: 'settings' }
@@ -26,13 +26,8 @@ export default function Sidebar({ activePage, setActivePage, isDark }: SidebarPr
     }`}>
       {/* Brand Logo */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-3">
-          <img 
-            src="https://lh3.googleusercontent.com/aida/ADBb0uhiu4Mj_TUXhJ0jUydJPdoV4Rbq3S0PNpnaF-0QdBlPmYYhdoFxkUJoP5OTScWfIl88Lvghm3LF_fkw2WbJuaOsKw0plz04shPJjvxus76IpYJCZPfKttjIdJ6YsypHmCb-ZCCEMOrNKgV6DCy-u4PhsGrCYx6L75_nUWZYo0DkoL8SdjU6cXODMCq76290XILPt4WuigtYZKLfu_Ogxu5_q0mg0k4SPVQPKiOhmhIaWNSn7iEfmCllNjY" 
-            alt="NeverLate Logo" 
-            className={`h-8 w-auto object-contain ${isDark ? 'grayscale invert' : ''}`}
-          />
-          <span className={isDark ? 'text-violet-500' : 'text-purple-600'}>NeverLate</span>
+        <h1 className="text-2xl font-bold tracking-tight text-purple-600">
+          NeverLate
         </h1>
         <p className={`text-xs font-medium mt-1 ${isDark ? 'text-zinc-500' : 'text-slate-500'}`}>
           Your Personal Life Agent
@@ -110,28 +105,6 @@ export default function Sidebar({ activePage, setActivePage, isDark }: SidebarPr
               +
             </button>
           </div>
-        </div>
-
-        {/* Upgrade Card / Premium Banner */}
-        <div className={`p-4 rounded-xl border ${
-          isDark ? 'bg-violet-600/10 border-violet-500/20' : 'bg-purple-600/5 border-purple-600/10'
-        }`}>
-          <p className={`font-semibold text-[10px] uppercase tracking-wider ${isDark ? 'text-violet-400' : 'text-purple-700'}`}>
-            PRO PLAN
-          </p>
-          <p className={`text-[11px] mt-1 leading-normal mb-3 ${isDark ? 'text-zinc-500' : 'text-slate-500'}`}>
-            Unlock predictive analytics & unlimited sources.
-          </p>
-          <button 
-            onClick={() => setActivePage('settings')}
-            className={`w-full py-2 text-xs font-bold rounded-lg transition-all active:scale-[0.98] ${
-              isDark 
-                ? 'bg-violet-600 text-white hover:bg-violet-700 shadow-md shadow-violet-600/20' 
-                : 'bg-purple-600 text-white hover:bg-purple-700 shadow-md shadow-purple-600/20'
-            }`}
-          >
-            Upgrade to Pro
-          </button>
         </div>
 
         {/* External Links */}
