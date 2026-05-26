@@ -2,5 +2,8 @@
   "name": "@neverlate/server",
   "scripts": {
     "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
   }
 }
