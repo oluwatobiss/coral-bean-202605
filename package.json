@@ -2,8 +2,8 @@
   "name": "neverlate",
   "version": "0.0.0",
   "private": true,
-    "workspaces": [
-    "apps/*",
+  "workspaces": [
+          "apps/*",
     "packages/*"
   ],
   "description": "NeverLate is an AI assistant that connects scattered personal information sources (email, calendar, notes, documents, tasks, etc.), understands them through a unified data layer using Coral, and proactively surfaces important things users are likely to miss before they become problems.",
