@@ -1,4 +1,4 @@
-# Coral Beans
+# NeverLate
 
 `Coral Beans` is a React-based productivity dashboard built with Vite, TypeScript, and Tailwind CSS. It presents a polished UI for a personal AI assistant experience, with mock chat, insight summaries, connected sources, and personalization settings.
 
