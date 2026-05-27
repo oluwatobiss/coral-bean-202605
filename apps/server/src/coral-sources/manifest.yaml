@@ -1,0 +1,34 @@
+name: gmail
+version: "1.0.0"
+description: "Custom Gmail source for the NeverLate agent"
+
+auth:
+  type: bearer
+  token: ${GMAIL_ACCESS_TOKEN}
+
+tables:
+  emails:
+    description: "Fetches user emails from Gmail"
+    endpoint: "https://gmail.googleapis.com/gmail/v1/users/me/messages"
+    method: GET
+
+    # The standard Gmail list response wraps items in a "messages" array
+    data_path: "messages"
+
+    # Query parameters that Coral can pass down to the API
+    params:
+      maxResults: 100
+      q: ${query} # Allows pushing down SQL WHERE clauses to Gmail's 'q' search parameter
+
+    columns:
+      - name: id
+        type: string
+        description: "The unique ID of the message."
+      - name: threadId
+        type: string
+        description: "The ID of the thread the message belongs to."
+      # Depending on Coral's schema configuration for detailed API calls,
+      # map the message details (snippet, payload.headers) here.
+      - name: snippet
+        type: string
+        description: "A short part of the message text."
