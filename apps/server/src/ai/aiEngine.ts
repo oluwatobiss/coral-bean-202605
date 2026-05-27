@@ -4,9 +4,9 @@ import {
   generateMetrics, 
   generateMemory, 
   chatHeuristic,
-  Email,
-  CalendarEvent
-} from "./heuristicEngine";
+  type Email,
+  type CalendarEvent
+} from "./heuristicEngine.js";
 
 // Flag to switch to LLM engine in the future when API keys are available
 const USE_LLM = false;

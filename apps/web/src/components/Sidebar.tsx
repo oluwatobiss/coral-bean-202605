@@ -9,6 +9,7 @@ interface SidebarProps {
 export default function Sidebar({ activePage, setActivePage, isDark }: SidebarProps) {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: "dashboard" },
+    { id: "dashboard2", label: "Dashboard 2", icon: "dashboard" },
     { id: "events", label: "Agenda / Events", icon: "calendar_today" },
     { id: "reminders", label: "Reminders", icon: "notifications_active" },
     { id: "actions", label: "Actions", icon: "bolt" },
