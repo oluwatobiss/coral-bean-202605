@@ -1,34 +1,52 @@
 name: gmail
 version: "1.0.0"
-description: "Custom Gmail source for the NeverLate agent"
+dsl_version: 3
+backend: http
+description: >-
+  Query emails from Gmail.
 
+# Define the inputs Coral should prompt for during setup
+inputs:
+  GMAIL_ACCESS_TOKEN:
+    kind: secret
+    hint: "OAuth Access Token for the Gmail API"
+
+base_url: "https://gmail.googleapis.com"
+
+# Use HeaderAuth to template the token into the request
 auth:
-  type: bearer
-  token: ${GMAIL_ACCESS_TOKEN}
+  type: HeaderAuth
+  headers:
+    - name: Authorization
+      from: template
+      template: "Bearer {{input.GMAIL_ACCESS_TOKEN}}"
 
+# Tables must be an array (list)
 tables:
-  emails:
+  - name: emails
     description: "Fetches user emails from Gmail"
-    endpoint: "https://gmail.googleapis.com/gmail/v1/users/me/messages"
-    method: GET
 
-    # The standard Gmail list response wraps items in a "messages" array
-    data_path: "messages"
+    # API details are now grouped in the 'request' block
+    request:
+      # Embed the maxResults and pushdown query directly in the URL
+      path: "/gmail/v1/users/me/messages?maxResults=100"
+      method: GET
 
-    # Query parameters that Coral can pass down to the API
-    params:
-      maxResults: 100
-      q: ${query} # Allows pushing down SQL WHERE clauses to Gmail's 'q' search parameter
+    # Parsing instructions are grouped in the 'response' block
+    response:
+      rows_path:
+        - messages
 
+    # Use 'Utf8' instead of 'string' for DataFusion compatibility
     columns:
       - name: id
-        type: string
+        type: Utf8
         description: "The unique ID of the message."
       - name: threadId
-        type: string
+        type: Utf8
         description: "The ID of the thread the message belongs to."
       # Depending on Coral's schema configuration for detailed API calls,
       # map the message details (snippet, payload.headers) here.
       - name: snippet
-        type: string
+        type: Utf8
         description: "A short part of the message text."
