@@ -73,7 +73,5 @@ tables:
         type: Utf8
       - name: snippet
         type: Utf8
-      - name: subject
-        type: Utf8
-      - name: sender
+      - name: payload
         type: Utf8

@@ -74,8 +74,8 @@ export async function getRecentEmails(): Promise<Email[]> {
   try {
     const rawData = await runCoralCommand<any[]>("SELECT * FROM gmail.emails LIMIT 5");
 
-    // console.log("=== Raw Coral Email Data ===");
-    // console.log(rawData);
+    console.log("=== Raw Coral Email Data ===");
+    console.log(rawData);
 
     // Normalize Coral output to match our strict Email interface
     const emails: Email[] = await Promise.all(rawData.map(async (row) => {
@@ -85,13 +85,33 @@ export async function getRecentEmails(): Promise<Email[]> {
       // If snippet is missing or null, fetch it from the message table
       if (!snippet && row.id) {
         try {
-          const detail = await runCoralCommand<any[]>(`SELECT snippet, subject, sender FROM gmail.message WHERE id = '${row.id}'`);
+          const detail = await runCoralCommand<any[]>(`SELECT snippet, payload FROM gmail.message WHERE id = '${row.id}'`);
+          console.log("=== Raw Coral Email Data ===");
           console.log(detail);
           if (detail && detail.length > 0) {
-            
             if (detail[0].snippet) snippet = detail[0].snippet;
-            if (!row.subject && detail[0].subject) row.subject = detail[0].subject;
-            if (!row.sender && detail[0].sender) row.sender = detail[0].sender;
+            
+            if (detail[0].payload) {
+              try {
+                const payloadObj = typeof detail[0].payload === 'string' 
+                  ? JSON.parse(detail[0].payload) 
+                  : detail[0].payload;
+                  
+                if (payloadObj && payloadObj.headers && Array.isArray(payloadObj.headers)) {
+                  const subjectHeader = payloadObj.headers.find((h: any) => h.name && h.name.toLowerCase() === 'subject');
+                  const fromHeader = payloadObj.headers.find((h: any) => h.name && h.name.toLowerCase() === 'from');
+                  
+                  if (!row.subject || row.subject === "No Subject") {
+                    if (subjectHeader) row.subject = subjectHeader.value;
+                  }
+                  if (!row.sender || row.sender === "Unknown") {
+                    if (fromHeader) row.sender = fromHeader.value;
+                  }
+                }
+              } catch (e) {
+                console.error("Failed to parse payload for email", row.id);
+              }
+            }
           }
         } catch (err) {
           console.log(`Could not fetch detail for ${row.id}`);
