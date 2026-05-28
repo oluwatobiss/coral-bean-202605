@@ -4,6 +4,8 @@ export interface Email {
   sender: string;
   snippet: string;
   date: string;
+  labels?: string[];
+  priority?: string;
 }
 
 export interface CalendarEvent {
@@ -12,6 +14,7 @@ export interface CalendarEvent {
   start: string;
   end: string;
   location: string;
+  priority?: string;
 }
 
 export interface SlackMessage {
@@ -67,7 +70,7 @@ export function extractInsights(emails: Email[], events: CalendarEvent[]): Insig
         id: `email-${email.id}`,
         type: 'Interview',
         severity: 'High Risk',
-        text: `Interview/Job related email from ${email.sender.split('<')[0].trim()}`,
+        text: `Interview/Job related email from ${email.sender.split('<')[0]?.trim() || "Unknown"}`,
         desc: email.subject.slice(0, 40) + '...',
         action: 'Review Now',
         colorLight: 'bg-violet-100 text-violet-700',
@@ -161,7 +164,7 @@ export function buildTimeline(
       time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       dateObj: date,
       title: em.subject.slice(0, 30) + '...',
-      type: `Email from ${em.sender.split('<')[0].trim()}`,
+      type: `Email from ${em.sender.split('<')[0]?.trim() || "Unknown"}`,
       isAI: false,
       dotColorLight: 'bg-purple-500',
       dotColorDark: 'bg-violet-400',
@@ -244,7 +247,7 @@ export function chatHeuristic(query: string, events: CalendarEvent[], emails: Em
   if (lowerQuery.includes('email') || lowerQuery.includes('attention')) {
     const important = emails.filter(e => e.subject.toLowerCase().includes('interview') || e.subject.toLowerCase().includes('due'));
     if (important.length > 0) {
-      return `I found ${important.length} emails that might need your attention, mostly related to interviews or deadlines from: ${important.map(e => e.sender.split('<')[0].trim()).join(', ')}.`;
+      return `I found ${important.length} emails that might need your attention, mostly related to interviews or deadlines from: ${important.map(e => e.sender.split('<')[0]?.trim() || "Unknown").join(', ')}.`;
     }
     return `You have ${emails.length} recent emails, but none seem critically urgent based on my scanning.`;
   }

@@ -1,4 +1,4 @@
-import { Email, CalendarEvent, Insight, TimelineEvent } from "./heuristicEngine";
+import type { Email, CalendarEvent, Insight, TimelineEvent } from "./heuristicEngine.js";
 
 /**
  * Placeholder for future LLM integration (Gemini / OpenAI).
