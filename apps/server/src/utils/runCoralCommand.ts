@@ -41,6 +41,6 @@ export async function runCoralCommand<T>(query: string): Promise<T> {
   } catch (error) {
     console.error("Failed to execute Coral command:", command);
     console.error(error);
-    throw new Error("Coral command execution failed");
+    throw new Error(`Coral command execution failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

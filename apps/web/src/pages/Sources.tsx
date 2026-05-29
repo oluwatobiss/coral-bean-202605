@@ -12,64 +12,85 @@ export default function Sources({ isDark }: SourcesProps) {
   const [loadingId, setLoadingId] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/google/status')
+    fetch('http://localhost:3000/api/sources/status')
       .then(res => res.json())
       .then(data => {
-        if (data.connected) {
-          setSources(prev => prev.map(src => 
-            (src.id === 'gmail' || src.id === 'calendar') 
-              ? { ...src, connected: true, email: data.email, lastSync: 'Just now' }
-              : src
-          ))
-        } else {
-          setSources(prev => prev.map(src => 
-            (src.id === 'gmail' || src.id === 'calendar') 
-              ? { ...src, connected: false }
-              : src
-          ))
-        }
+        setSources(prev => prev.map(src => {
+          const statusObj = data[src.id];
+          if (statusObj) {
+            return {
+              ...src,
+              connected: statusObj.connected && statusObj.enabled,
+              // Keep original connected flag just in case
+              _coralConnected: statusObj.connected,
+              _localEnabled: statusObj.enabled,
+              lastSync: statusObj.connected && statusObj.enabled ? 'Just now' : src.lastSync
+            };
+          }
+          return src;
+        }))
       })
-      .catch(err => console.error("Error fetching google status", err))
+      .catch(err => console.error("Error fetching source status", err))
   }, [])
 
   const handleToggle = async (id: string) => {
     if (id === 'gmail' || id === 'calendar') {
-      const source = sources.find(s => s.id === id)
-      if (source?.connected) {
-        setLoadingId(id)
-        try {
-          await fetch('http://localhost:3000/api/google/disconnect', { method: 'POST' })
-          setSources(prev => prev.map(src => 
-            (src.id === 'gmail' || src.id === 'calendar') 
-              ? { ...src, connected: false }
-              : src
-          ))
-        } catch (e) {
-          console.error(e)
-        } finally {
-          setLoadingId(null)
-        }
-      } else {
-        setLoadingId(id)
-        try {
-          const res = await fetch('http://localhost:3000/api/auth/google/url')
-          const data = await res.json()
-          if (data.url) {
-            window.location.href = data.url
+      const source = sources.find(s => s.id === id) as any;
+      const isCurrentlyActive = source?.connected;
+      
+      setLoadingId(id)
+      try {
+        if (isCurrentlyActive) {
+          // Disable it
+          const res = await fetch('http://localhost:3000/api/sources/disable', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sourceId: id })
+          });
+          
+          if (!res.ok) {
+            throw new Error(`Server returned ${res.status}: ${res.statusText}`);
           }
-        } catch (e) {
-          console.error(e)
-          setLoadingId(null)
+          
+          setSources(prev => prev.map(src => 
+            src.id === id ? { ...src, connected: false, _localEnabled: false } : src
+          ))
+        } else {
+          // Connect it
+          const res = await fetch('http://localhost:3000/api/sources/connect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sourceId: id })
+          });
+          
+          if (!res.ok) {
+             if (res.status === 404) throw new Error("Source not found in Coral.");
+             if (res.status === 500) throw new Error("Internal server error connecting to Coral.");
+             throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+          }
+
+          const data = await res.json();
+          if (data.success && data.connected) {
+            setSources(prev => prev.map(src => 
+              src.id === id ? { ...src, connected: true, _coralConnected: true, _localEnabled: true, lastSync: 'Just now' } : src
+            ))
+          } else {
+            alert(data.error || "Source not found in Coral. Please configure the CLI.");
+          }
         }
+      } catch (e: any) {
+        console.error(e)
+        alert(e.message === 'Failed to fetch' ? 'Network failure: Unable to communicate with NeverLate server (ensure backend is running).' : e.message);
+      } finally {
+        setLoadingId(null)
       }
     } else {
+      // Dummy logic for others
       setLoadingId(id)
       setTimeout(() => {
-        setSources(prev => 
-          prev.map(src => src.id === id ? { ...src, connected: !src.connected, lastSync: 'Just now' } : src)
-        )
+        alert("This source is not supported in the MVP.");
         setLoadingId(null)
-      }, 1200)
+      }, 800)
     }
   }
 
@@ -87,7 +108,7 @@ export default function Sources({ isDark }: SourcesProps) {
       {/* Bento Grid layout */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         
-        {sources.map((src) => (
+        {sources.map((src: any) => (
           <div key={src.id} className={`p-6 rounded-2xl border shadow-sm flex flex-col h-full hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 ${
             isDark 
               ? 'bg-[#18181b] border-zinc-800 hover:border-violet-500/20' 
@@ -140,7 +161,7 @@ export default function Sources({ isDark }: SourcesProps) {
                 {loadingId === src.id ? (
                   <span className="w-3.5 h-3.5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  src.connected ? 'Disconnect' : 'Connect'
+                  src.connected ? 'Disable' : 'Connect'
                 )}
               </button>
             </div>

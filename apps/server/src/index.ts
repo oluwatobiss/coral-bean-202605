@@ -3,14 +3,15 @@ import express, { type Request, type Response } from "express";
 import cors from "cors";
 import path from "path";
 import { processDashboardData, processChat, getActiveNotifications } from "./ai/aiEngine.ts";
-import { getRecentEmails, getUpcomingEvents } from "./services/coralService.ts";
+import { getRecentEmails, getUpcomingEvents, verifyCoralSource } from "./services/coralService.ts";
+import { getPreferences, updatePreference } from "./utils/preferences.ts";
 
 dotenv.config({ path: path.resolve(process.cwd(), "../../.env") });
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors({ origin: "http://localhost:5173" }));
+app.use(cors()); // Allow all origins for dev to prevent port-hopping CORS issues
 app.use(express.json());
 
 app.get("/", (req: Request, res: Response) => {
@@ -40,11 +41,72 @@ app.get("/api/google/calendar", async (req, res) => {
   }
 });
 
-// AI Endpoints powered by Coral Data
+
+
+// Coral Source Management Endpoints
+app.get("/api/sources/status", async (req, res) => {
+  try {
+    const prefs = getPreferences();
+    const [gmailConnected, calendarConnected] = await Promise.all([
+      verifyCoralSource('gmail.emails'),
+      verifyCoralSource('google_calendar.events')
+    ]);
+
+    res.json({
+      gmail: { connected: gmailConnected, enabled: prefs.gmail_enabled },
+      calendar: { connected: calendarConnected, enabled: prefs.google_calendar_enabled },
+      slack: { connected: false, enabled: false },
+      drive: { connected: false, enabled: false },
+      keep: { connected: false, enabled: false }
+    });
+  } catch (error) {
+    console.error("Error fetching source status", error);
+    res.status(500).json({ error: "Failed to fetch source status" });
+  }
+});
+
+app.post("/api/sources/connect", async (req, res) => {
+  try {
+    const { sourceId } = req.body;
+    let tableName = "";
+    if (sourceId === "gmail") tableName = "gmail.emails";
+    else if (sourceId === "calendar") tableName = "google_calendar.events";
+    else return res.status(400).json({ error: "Unknown source ID" });
+
+    const isConnected = await verifyCoralSource(tableName);
+    if (!isConnected) {
+      return res.status(404).json({ error: "Source not found in Coral. Please configure the CLI." });
+    }
+
+    // Force enabled to true since the user actively verified it
+    updatePreference(`${sourceId}_enabled` as any, true);
+    
+    res.json({ success: true, connected: true, enabled: true });
+  } catch (error) {
+    console.error("Error verifying source connection", error);
+    res.status(500).json({ error: "Verification failed" });
+  }
+});
+
+app.post("/api/sources/disable", async (req, res) => {
+  try {
+    const { sourceId } = req.body;
+    if (sourceId !== "gmail" && sourceId !== "calendar") {
+      return res.status(400).json({ error: "Unknown source ID" });
+    }
+
+    updatePreference(`${sourceId}_enabled` as any, false);
+    res.json({ success: true, enabled: false });
+  } catch (error) {
+    console.error("Error disabling source", error);
+    res.status(500).json({ error: "Disable failed" });
+  }
+});
+
+// AI Endpoints powered by Coral Data via MCP Layer
 app.get("/api/ai/dashboard", async (req, res) => {
   try {
-    const [emails, events] = await Promise.all([getRecentEmails(), getUpcomingEvents()]);
-    const data = await processDashboardData(emails, events);
+    const data = await processDashboardData();
     res.json(data);
   } catch (error) {
     console.error("Error in AI dashboard", error);
@@ -55,8 +117,7 @@ app.get("/api/ai/dashboard", async (req, res) => {
 app.post("/api/ai/chat", async (req, res) => {
   try {
     const { query } = req.body;
-    const [emails, events] = await Promise.all([getRecentEmails(), getUpcomingEvents()]);
-    const reply = await processChat(query, emails, events);
+    const reply = await processChat(query);
     res.json({ reply });
   } catch (error) {
     console.error("Error in AI chat", error);
@@ -66,8 +127,7 @@ app.post("/api/ai/chat", async (req, res) => {
 
 app.get("/api/ai/notifications", async (req, res) => {
   try {
-    const [emails, events] = await Promise.all([getRecentEmails(), getUpcomingEvents()]);
-    const notifications = getActiveNotifications(emails, events);
+    const notifications = await getActiveNotifications();
     res.json(notifications);
   } catch (error) {
     console.error("Error in AI notifications", error);
