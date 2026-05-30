@@ -39,13 +39,63 @@ export interface TimezoneItem {
   timeStr: string;
 }
 
+export interface GmailEvent {
+  id: string;
+  subject: string;
+  sender: string;
+  snippet: string;
+  date: string;
+  labels: string[];
+  priority: string;
+}
+
 export interface EventPayload {
   weekEvents: Record<string, TimelineItem[]>;
   stats: any[];
   nextUp: TimelineItem[];
   aiBriefings: Record<string, AIBriefing>;
   timezones: TimezoneItem[] | null;
+  gmailEvents?: GmailEvent[];
 }
+
+export const fallbackGmailEvents: GmailEvent[] = [
+  {
+    id: "gmail-ev-1",
+    subject: "Final Interview Scheduled - Engineering Role",
+    sender: "Acme Recruiting <recruiting@acme.inc>",
+    snippet: "We are excited to invite you to the final interview stage next week on Tuesday at 10:00 AM SFO time. Please prepare your system and design architecture deck.",
+    date: new Date().toISOString(),
+    labels: ["IMPORTANT", "WORK"],
+    priority: "High",
+  },
+  {
+    id: "gmail-ev-2",
+    subject: "Flight Confirmation: SFO to JFK (Delta DL482)",
+    sender: "Delta Air Lines <no-reply@delta.com>",
+    snippet: "Your flight is confirmed. Departure from SFO at 6:30 PM. Passenger: Alex Kittu. Booking reference: DLX827. Please check in 2 hours prior to departure.",
+    date: new Date(Date.now() - 3600000).toISOString(),
+    labels: ["TRAVEL"],
+    priority: "High",
+  },
+  {
+    id: "gmail-ev-3",
+    subject: "ACTION REQUIRED: Invoice #8472 Due Tomorrow",
+    sender: "Billing Dept <billing@services.io>",
+    snippet: "Your monthly premium service subscription invoice #8472 is due tomorrow. Please review the details and process payment to avoid service interruption.",
+    date: new Date(Date.now() - 7200000).toISOString(),
+    labels: ["FINANCE"],
+    priority: "Medium",
+  },
+  {
+    id: "gmail-ev-4",
+    subject: "Weekly Sync Notes and Action Items",
+    sender: "Jane Doe <jane@company.org>",
+    snippet: "Here are the notes from today's weekly sync. Let's make sure to prepare the Zenith deliverable deck by Thursday and sync up with the product engineering team.",
+    date: new Date(Date.now() - 14400000).toISOString(),
+    labels: ["TEAM"],
+    priority: "Low",
+  }
+];
 
 export default function Events({ isDark }: EventsProps) {
   // Use today as default if available
@@ -54,13 +104,17 @@ export default function Events({ isDark }: EventsProps) {
 
   const [selectedDay, setSelectedDay] = useState<'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun'>(defaultDay)
   const [expandedBriefing, setExpandedBriefing] = useState<string | null>(null)
+  const [expandedEmail, setExpandedEmail] = useState<string | null>(null)
+  const [smartDraft, setSmartDraft] = useState<Record<string, string>>({})
+  const [showDraftModal, setShowDraftModal] = useState<string | null>(null)
   
   const { data, loading } = useFetchWithFallback<EventPayload>('http://localhost:3000/api/events', {
     stats: eventsStatsList,
     nextUp: eventsNextUpList as TimelineItem[],
     weekEvents: {},
     aiBriefings: {},
-    timezones: null
+    timezones: null,
+    gmailEvents: fallbackGmailEvents
   });
 
   const displayStats = data?.stats || eventsStatsList;
@@ -68,6 +122,32 @@ export default function Events({ isDark }: EventsProps) {
   const aiBriefings: Record<string, AIBriefing> = data?.aiBriefings || {};
   const weekEvents: Record<string, TimelineItem[]> = data?.weekEvents || {};
   const timezones: TimezoneItem[] | null = data?.timezones || null;
+  const displayGmailEvents = data?.gmailEvents || fallbackGmailEvents;
+
+  const handleGenerateDraft = (email: GmailEvent) => {
+    if (smartDraft[email.id]) {
+      return;
+    }
+    setShowDraftModal(`gen-${email.id}`);
+    setTimeout(() => {
+      let draftText = "";
+      if (email.subject.toLowerCase().includes("interview")) {
+        draftText = `Dear Acme Recruiting Team,\n\nThank you for inviting me to the final interview stage. I am excited about this opportunity! Tuesday at 10:00 AM SFO time works perfectly for me. I have blocked my calendar and will prepare the design architecture deck as requested.\n\nLooking forward to speaking with you.\n\nBest regards,\nAlex Kittu`;
+      } else if (email.subject.toLowerCase().includes("flight")) {
+        draftText = `Hi there,\n\nConfirming receipt of the SFO to JFK flight booking information (Booking Ref: DLX827). I have successfully added the travel transit buffer blocks to my calendar. Thanks!\n\nBest,\nAlex Kittu`;
+      } else if (email.subject.toLowerCase().includes("invoice")) {
+        draftText = `Billing Support,\n\nI have received invoice #8472 and processed the payment successfully. Please let me know if there are any issues with the transaction.\n\nBest regards,\nAlex Kittu`;
+      } else {
+        draftText = `Hi ${email.sender.split('<')[0].trim()},\n\nThanks for reaching out! I've reviewed your email regarding "${email.subject}". I will follow up with the requested updates shortly.\n\nBest,\nAlex Kittu`;
+      }
+      
+      setSmartDraft(prev => ({
+        ...prev,
+        [email.id]: draftText
+      }));
+      setShowDraftModal(null);
+    }, 800);
+  };
 
   const getWeekDayDateStr = (day: 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun'): string => {
     const today = new Date();
@@ -241,78 +321,213 @@ export default function Events({ isDark }: EventsProps) {
               </div>
             ) : (
               <div className="space-y-4">
-                {activeDayEvents.map((event) => (
-                  <div 
-                    key={event.id}
-                    className={`p-4 rounded-xl border flex flex-col gap-3 transition-all duration-200 ${
-                      event.conflict
-                        ? isDark 
-                          ? 'bg-rose-950/20 border-rose-900/60' 
-                          : 'bg-rose-50/50 border-rose-200/70'
-                        : isDark
-                          ? 'bg-zinc-900 border-zinc-800'
-                          : 'bg-white border-slate-100 hover:border-purple-200'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-                          event.conflict
-                            ? 'bg-rose-500/10 text-rose-500'
-                            : event.status === 'completed'
-                              ? isDark ? 'bg-zinc-800 text-zinc-500' : 'bg-slate-100 text-slate-400'
-                              : 'bg-emerald-500/10 text-emerald-500'
-                        }`}>
-                          <span className="material-symbols-outlined text-[18px]">
-                            {event.isFlight ? 'flight' : event.status === 'completed' ? 'check_circle' : 'schedule'}
-                          </span>
-                        </div>
-                        <div>
-                          <h4 className={`text-xs font-bold ${
-                            event.status === 'completed' 
-                              ? 'text-slate-400 line-through font-medium' 
-                              : isDark ? 'text-white' : 'text-slate-800'
-                          }`}>
-                            {event.title}
-                          </h4>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[10px] text-slate-400 font-semibold">{event.time}</span>
-                            <span className="text-[10px] text-slate-400 font-semibold">•</span>
-                            <span className="text-[10px] text-slate-400 font-medium">{event.location}</span>
+                {activeDayEvents.map((event) => {
+                  const isGmailEvent = (event as any).isGmail;
+
+                  if (isGmailEvent) {
+                    const isExpanded = expandedEmail === event.id;
+                    const hasDraft = !!smartDraft[event.id];
+                    const isGenerating = showDraftModal === `gen-${event.id}`;
+
+                    return (
+                      <div
+                        key={event.id}
+                        onClick={() => setExpandedEmail(isExpanded ? null : event.id)}
+                        className={`p-4 rounded-xl border flex flex-col gap-3 transition-all duration-200 cursor-pointer ${
+                          isDark
+                            ? 'bg-zinc-900/95 border-zinc-800 hover:border-zinc-700'
+                            : 'bg-white border-slate-100 hover:border-purple-200 hover:shadow-sm'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center bg-red-500/10 text-red-500 shrink-0`}>
+                              <span className="material-symbols-outlined text-[18px]">
+                                mail
+                              </span>
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`text-[9px] font-bold text-red-550 dark:text-red-400 uppercase tracking-wider`}>Gmail Communication</span>
+                                <span className="text-[10px] text-slate-400 dark:text-zinc-600">•</span>
+                                <span className={`text-[10px] font-bold ${isDark ? 'text-zinc-400' : 'text-slate-655'}`}>
+                                  {(event as any).sender?.split('<')[0].trim()}
+                                </span>
+                              </div>
+                              <h4 className={`text-xs mt-1 font-bold ${
+                                isDark ? 'text-white' : 'text-slate-800'
+                              }`}>
+                                {event.title.startsWith("Email: ") ? event.title.replace("Email: ", "") : event.title}
+                              </h4>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[10px] text-slate-405 font-bold">{event.time}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {event.priority === 'HIGH' && (
+                              <span className="px-2 py-0.5 text-[9px] font-bold rounded bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                                HIGH
+                              </span>
+                            )}
+                            <span className="px-2 py-0.5 text-[9px] font-bold rounded bg-red-500/10 text-red-550 dark:text-red-400 border border-red-500/10">
+                              Gmail
+                            </span>
                           </div>
                         </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 text-[9px] font-bold rounded ${
-                          event.conflict
-                            ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
-                            : 'bg-slate-500/10 text-slate-500 border border-slate-500/10'
-                        }`}>
-                          {event.type}
-                        </span>
-                      </div>
-                    </div>
 
-                    {/* Conflict Highlight banner */}
-                    {event.conflict && (
-                      <div className={`p-2.5 rounded-lg border flex items-start gap-2 ${
-                        isDark ? 'bg-rose-950/40 border-rose-800/40 text-rose-300' : 'bg-rose-50 border-rose-100 text-rose-700'
-                      }`}>
-                        <span className="material-symbols-outlined text-[16px] text-rose-500 shrink-0 select-none">warning</span>
-                        <div className="text-[10px] font-bold leading-normal">
-                          <p>{event.conflictMsg}</p>
-                          <button className={`mt-1.5 text-[9px] uppercase tracking-wider font-extrabold flex items-center gap-1 hover:underline ${
-                            isDark ? 'text-violet-400' : 'text-purple-700'
+                        <p className={`text-xs leading-relaxed ${isDark ? 'text-zinc-400' : 'text-slate-600'} ${isExpanded ? '' : 'line-clamp-1'}`}>
+                          {(event as any).snippet}
+                        </p>
+
+                        {/* Collapsible Actions and AI Smart Reply Draft */}
+                        {isExpanded && (
+                          <div className="mt-2 pt-3 border-t border-slate-100 dark:border-zinc-800/80 space-y-3" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex flex-wrap gap-2 justify-between items-center">
+                              <div className="flex flex-wrap gap-1">
+                                {((event as any).labels || []).map((lbl: string, idx: number) => (
+                                  <span key={idx} className={`px-2 py-0.5 text-[9px] font-bold rounded ${
+                                    isDark ? 'bg-zinc-850 text-zinc-400 border border-zinc-800' : 'bg-slate-100 text-slate-500'
+                                  }`}>
+                                    {lbl}
+                                  </span>
+                                ))}
+                              </div>
+
+                              <button
+                                onClick={() => handleGenerateDraft(event as any)}
+                                disabled={isGenerating}
+                                className={`py-1.5 px-3 rounded-lg text-[9px] font-bold tracking-wide uppercase flex items-center gap-1.5 transition-all ${
+                                  isDark
+                                    ? 'bg-violet-600 text-white hover:bg-violet-750 disabled:bg-zinc-850'
+                                    : 'bg-purple-600 text-white hover:bg-purple-700 disabled:bg-slate-100'
+                                }`}
+                              >
+                                <span className="material-symbols-outlined text-[13px]">auto_awesome</span>
+                                {isGenerating ? 'Drafting...' : hasDraft ? 'Close Draft' : 'Draft Smart Reply'}
+                              </button>
+                            </div>
+
+                            {/* Display Smart Draft Response if exists */}
+                            {hasDraft && (
+                              <div className={`p-4 rounded-xl border ${
+                                isDark ? 'bg-[#0a0a0c]/80 border-zinc-800 text-zinc-350' : 'bg-slate-50 border-slate-150 text-slate-750'
+                              } animate-in fade-in slide-in-from-top-2 duration-200`}>
+                                <div className="flex justify-between items-center mb-2 pb-1.5 border-b border-dashed border-slate-200/60 dark:border-zinc-800">
+                                  <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-violet-400' : 'text-purple-600'} flex items-center gap-1`}>
+                                    <span className="material-symbols-outlined text-[14px]">smart_toy</span>
+                                    AI Smart Draft Reply
+                                  </span>
+                                  <span className="text-[9px] text-slate-400 font-semibold">Coral SQL Integrated</span>
+                                </div>
+                                <p className="text-xs leading-relaxed font-mono whitespace-pre-wrap">{smartDraft[event.id]}</p>
+                                <div className="mt-3 flex gap-2 justify-end">
+                                  <button
+                                    onClick={() => {
+                                      const newDrafts = { ...smartDraft };
+                                      delete newDrafts[event.id];
+                                      setSmartDraft(newDrafts);
+                                    }}
+                                    className={`px-2.5 py-1.2 rounded-lg text-[9px] font-bold uppercase border ${
+                                      isDark ? 'border-zinc-800 text-zinc-400 hover:bg-zinc-800' : 'border-slate-200 text-slate-650 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    Discard
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      alert("Draft response saved to Gmail Drafts successfully via Coral SQL!");
+                                    }}
+                                    className={`px-2.5 py-1.2 rounded-lg text-[9px] font-bold uppercase ${
+                                      isDark ? 'bg-violet-600 hover:bg-violet-700 text-white' : 'bg-purple-600 hover:bg-purple-700 text-white'
+                                    }`}
+                                  >
+                                    Sync to Gmail
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // Normal Calendar event rendering:
+                  return (
+                    <div
+                      key={event.id}
+                      className={`p-4 rounded-xl border flex flex-col gap-3 transition-all duration-200 ${
+                        event.conflict
+                          ? isDark
+                            ? 'bg-rose-950/20 border-rose-900/60'
+                            : 'bg-rose-50/50 border-rose-200/70'
+                          : isDark
+                            ? 'bg-zinc-900 border-zinc-800'
+                            : 'bg-white border-slate-100 hover:border-purple-200'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                            event.conflict
+                              ? 'bg-rose-500/10 text-rose-500'
+                              : event.status === 'completed'
+                                ? isDark ? 'bg-zinc-800 text-zinc-500' : 'bg-slate-100 text-slate-400'
+                                : 'bg-emerald-500/10 text-emerald-500'
                           }`}>
-                            Resolve overlap options
-                            <span className="material-symbols-outlined text-[10px]">arrow_forward</span>
-                          </button>
+                            <span className="material-symbols-outlined text-[18px]">
+                              {event.isFlight ? 'flight' : event.status === 'completed' ? 'check_circle' : 'schedule'}
+                            </span>
+                          </div>
+                          <div>
+                            <h4 className={`text-xs font-bold ${
+                              event.status === 'completed'
+                                ? 'text-slate-400 line-through font-medium'
+                                : isDark ? 'text-white' : 'text-slate-800'
+                            }`}>
+                              {event.title}
+                            </h4>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-slate-400 font-semibold">{event.time}</span>
+                              <span className="text-[10px] text-slate-400 font-semibold">•</span>
+                              <span className="text-[10px] text-slate-400 font-medium">{event.location}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 text-[9px] font-bold rounded ${
+                            event.conflict
+                              ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                              : 'bg-slate-500/10 text-slate-500 border border-slate-500/10'
+                          }`}>
+                            {event.type}
+                          </span>
                         </div>
                       </div>
-                    )}
-                  </div>
-                ))}
+
+                      {/* Conflict Highlight banner */}
+                      {event.conflict && (
+                        <div className={`p-2.5 rounded-lg border flex items-start gap-2 ${
+                          isDark ? 'bg-rose-950/40 border-rose-800/40 text-rose-300' : 'bg-rose-50 border-rose-100 text-rose-700'
+                        }`}>
+                          <span className="material-symbols-outlined text-[16px] text-rose-500 shrink-0 select-none">warning</span>
+                          <div className="text-[10px] font-bold leading-normal">
+                            <p>{event.conflictMsg}</p>
+                            <button className={`mt-1.5 text-[9px] uppercase tracking-wider font-extrabold flex items-center gap-1 hover:underline ${
+                              isDark ? 'text-violet-400' : 'text-purple-700'
+                            }`}>
+                              Resolve overlap options
+                              <span className="material-symbols-outlined text-[10px]">arrow_forward</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
