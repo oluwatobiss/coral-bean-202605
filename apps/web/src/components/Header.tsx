@@ -17,6 +17,7 @@ export default function Header({ activePage, setActivePage, isDark, setIsDark }:
   const userName = gmailSource?.userName || (userEmail !== 'alex@gmail.com' 
     ? userEmail.split('@')[0].split(/[._-]/).map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ') 
     : 'Alex');
+  const avatarUrl = (gmailSource as any)?.avatarUrl;
 
   const [notifCount, setNotifCount] = useState(0)
 
@@ -127,12 +128,16 @@ export default function Header({ activePage, setActivePage, isDark, setIsDark }:
             <span className={`text-xs font-bold leading-none ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>{userName}</span>
             <span className="text-[9px] text-zinc-400 font-semibold mt-0.5">{userEmail}</span>
           </div>
-          <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs shadow-inner transition-transform group-hover:scale-105 ${
+          <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs shadow-inner transition-transform group-hover:scale-105 overflow-hidden ${
             isDark 
               ? 'bg-gradient-to-tr from-violet-600 to-fuchsia-650 text-white border border-violet-500/30' 
               : 'bg-gradient-to-tr from-purple-600 to-indigo-500 text-white border border-purple-500/30'
           }`}>
-            {userName.charAt(0).toUpperCase()}
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+            ) : (
+              userName.charAt(0).toUpperCase()
+            )}
           </div>
         </div>
       </div>

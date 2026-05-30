@@ -225,9 +225,9 @@ export async function verifyCoralSource(tableName: string): Promise<boolean> {
   }
 }
 
-export async function getCoralUserProfile(): Promise<{ email: string; name: string } | null> {
+export async function getCoralUserProfile(): Promise<{ email: string; name: string; avatarUrl: string | null } | null> {
   const cacheKey = "coral_user_profile";
-  const cached = coralCache.get<{ email: string; name: string }>(cacheKey);
+  const cached = coralCache.get<{ email: string; name: string; avatarUrl: string | null }>(cacheKey);
   if (cached) return cached;
 
   try {
@@ -286,7 +286,23 @@ export async function getCoralUserProfile(): Promise<{ email: string; name: stri
       console.log("Could not resolve dynamic user display name from email headers:", e);
     }
 
-    const profile = { email, name };
+    let avatarUrl: string | null = null;
+    try {
+      const profileData = await runCoralCommand<any[]>(
+        "SELECT photos FROM google_profile.me LIMIT 1"
+      );
+      if (profileData && profileData.length > 0 && profileData[0].photos) {
+         const photosStr = profileData[0].photos;
+         const photosObj = typeof photosStr === 'string' ? JSON.parse(photosStr) : photosStr;
+         if (Array.isArray(photosObj) && photosObj.length > 0 && photosObj[0].url) {
+           avatarUrl = photosObj[0].url;
+         }
+      }
+    } catch (e) {
+       console.log("Could not fetch avatar from google_profile (missing scope or source):", e);
+    }
+
+    const profile = { email, name, avatarUrl };
     coralCache.set(cacheKey, profile);
     return profile;
   } catch (error) {

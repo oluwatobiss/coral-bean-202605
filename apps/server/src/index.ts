@@ -4,6 +4,7 @@ import cors from "cors";
 import path from "path";
 import { processDashboardData, processChat, getActiveNotifications } from "./ai/aiEngine.ts";
 import { getRecentEmails, getUpcomingEvents, verifyCoralSource, getCoralUserProfile } from "./services/coralService.ts";
+import { getEventsContext } from "./services/eventsProcessor.ts";
 import { getPreferences, updatePreference } from "./utils/preferences.ts";
 // --- New REST Endpoints for Demo Data ---
 // These endpoints load from the shared mockData file to preserve hackathon velocity and demo reliability
@@ -72,20 +73,22 @@ app.get("/api/sources/status", async (req, res) => {
 
     let email: string | null = null;
     let name: string | null = null;
+    let avatarUrl: string | null = null;
     if (gmailConnected || calendarConnected) {
       const profile = await getCoralUserProfile();
       if (profile) {
         email = profile.email;
         name = profile.name;
+        avatarUrl = profile.avatarUrl;
       }
     }
 
     res.json({
-      gmail: { connected: gmailConnected, enabled: prefs.gmail_enabled, email: email || undefined, name: name || undefined },
-      calendar: { connected: calendarConnected, enabled: prefs.google_calendar_enabled, email: email || undefined, name: name || undefined },
+      gmail: { connected: gmailConnected, enabled: prefs.gmail_enabled, email: email || undefined, name: name || undefined, avatarUrl: avatarUrl || undefined },
+      calendar: { connected: calendarConnected, enabled: prefs.google_calendar_enabled, email: email || undefined, name: name || undefined, avatarUrl: avatarUrl || undefined },
       slack: { connected: false, enabled: false },
-      drive: { connected: false, enabled: false, email: email || undefined, name: name || undefined },
-      keep: { connected: false, enabled: false, email: email || undefined, name: name || undefined }
+      drive: { connected: false, enabled: false, email: email || undefined, name: name || undefined, avatarUrl: avatarUrl || undefined },
+      keep: { connected: false, enabled: false, email: email || undefined, name: name || undefined, avatarUrl: avatarUrl || undefined }
     });
   } catch (error) {
     console.error("Error fetching source status", error);
@@ -116,7 +119,8 @@ app.post("/api/sources/connect", async (req, res) => {
       connected: true, 
       enabled: true, 
       email: profile?.email || undefined, 
-      name: profile?.name || undefined 
+      name: profile?.name || undefined,
+      avatarUrl: profile?.avatarUrl || undefined
     });
   } catch (error) {
     console.error("Error verifying source connection", error);
@@ -171,11 +175,18 @@ app.get("/api/ai/notifications", async (req, res) => {
   }
 });
 
-app.get("/api/events", (req, res) => {
-  res.json({
-    stats: eventsStatsList,
-    nextUp: eventsNextUpList,
-  });
+app.get("/api/events", async (req, res) => {
+  try {
+    const data = await getEventsContext();
+    res.json(data);
+  } catch (error) {
+    console.error("Error processing events context", error);
+    // Fallback to mock data if it fails
+    res.json({
+      stats: eventsStatsList,
+      nextUp: eventsNextUpList,
+    });
+  }
 });
 
 app.get("/api/reminders", (req, res) => {

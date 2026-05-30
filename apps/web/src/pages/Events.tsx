@@ -6,18 +6,46 @@ interface EventsProps {
   isDark: boolean
 }
 
-interface WeekEventItem {
-  id: string
-  title: string
-  time: string
-  type: string
-  status: string
-  location: string
-  conflict?: boolean
-  conflictMsg?: string
-  isFlight?: boolean
-}
 import PlatformIcon from '../components/PlatformIcon'
+
+export interface TimelineItem {
+  id: string;
+  title: string;
+  time: string;
+  day: 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
+  dateStr: string;
+  startTime: Date;
+  endTime: Date;
+  type: string;
+  status: 'completed' | 'critical' | 'upcoming';
+  location: string;
+  conflict?: boolean;
+  conflictMsg?: string;
+  isFlight?: boolean;
+  priority?: string;
+  hasBriefing?: boolean;
+  icon?: string;
+  avatars?: string[];
+}
+
+export interface AIBriefing {
+  summary: string;
+  actions: string[];
+  docs: string[];
+}
+
+export interface TimezoneItem {
+  label: string;
+  timeStr: string;
+}
+
+export interface EventPayload {
+  weekEvents: Record<string, TimelineItem[]>;
+  stats: any[];
+  nextUp: TimelineItem[];
+  aiBriefings: Record<string, AIBriefing>;
+  timezones: TimezoneItem[] | null;
+}
 
 export default function Events({ isDark }: EventsProps) {
   const [selectedDay, setSelectedDay] = useState<'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun'>('Wed')
@@ -30,61 +58,13 @@ export default function Events({ isDark }: EventsProps) {
 
   const displayStats = data?.stats || eventsStatsList;
   const displayNextUp = data?.nextUp || eventsNextUpList;
+  const aiBriefings: Record<string, AIBriefing> = data?.aiBriefings || {};
+  const weekEvents: Record<string, TimelineItem[]> = data?.weekEvents || {};
+  const timezones: TimezoneItem[] | null = data?.timezones || null;
   
-  // Custom week schedule items for the interactive grid
-  const weekEvents: Record<'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun', WeekEventItem[]> = {
-    Mon: [
-      { id: 'mon-1', title: 'Product Roadmap Planning', time: '09:30 AM - 11:00 AM', type: 'Strategy', status: 'completed', location: 'Meeting Room A' },
-      { id: 'mon-2', title: 'Weekly Sync', time: '02:00 PM - 02:30 PM', type: 'Sync', status: 'completed', location: 'Google Meet' }
-    ],
-    Tue: [
-      { id: 'tue-1', title: 'Client Q3 Demo Preparation', time: '11:00 AM - 12:00 PM', type: 'Design', status: 'completed', location: 'Virtual' },
-      { id: 'tue-2', title: 'Engineering Backlog Grooming', time: '03:00 PM - 04:00 PM', type: 'Tech', status: 'completed', location: 'Slack Huddle' }
-    ],
-    Wed: [
-      { id: 'wed-1', title: 'Team Meeting & Sync', time: '10:00 AM - 11:30 AM', type: 'Collaboration', status: 'critical', location: 'HQ Conference Room', conflict: true, conflictMsg: 'Overlaps with Travel Window to Heathrow Airport' },
-      { id: 'wed-2', title: 'Flight to Nairobi (NBO)', time: '02:30 PM Departure', type: 'Travel', status: 'critical', location: 'LHR Terminal 5', isFlight: true, conflict: true, conflictMsg: 'Flight transit overlaps with Team Meeting travel time' },
-      { id: 'wed-3', title: 'Hotel Check-in & Settle', time: '10:30 PM', type: 'Travel', status: 'upcoming', location: 'Nairobi Serena Hotel' }
-    ],
-    Thu: [
-      { id: 'thu-1', title: 'Regional Partner Keynote', time: '09:00 AM - 10:30 AM', type: 'Event', status: 'upcoming', location: 'Nairobi Hub' },
-      { id: 'thu-2', title: 'Field Office Tour & Feedback', time: '01:00 PM - 03:00 PM', type: 'Site Visit', status: 'upcoming', location: 'Field Office' }
-    ],
-    Fri: [
-      { id: 'fri-1', title: 'Sub-Saharan Growth Panel', time: '11:00 AM - 01:00 PM', type: 'Presentation', status: 'upcoming', location: 'Auditorium' },
-      { id: 'fri-2', title: 'Debrief & Happy Hour', time: '05:00 PM - 07:00 PM', type: 'Social', status: 'upcoming', location: 'Tribeka Lounge' }
-    ],
-    Sat: [
-      { id: 'sat-1', title: 'Weekend Focus / Sightseeing', time: 'All Day', type: 'Personal', status: 'upcoming', location: 'Nairobi National Park' }
-    ],
-    Sun: [
-      { id: 'sun-1', title: 'Return Flight to London (LHR)', time: '08:00 AM Departure', type: 'Travel', status: 'upcoming', location: 'NBO Airport' }
-    ]
-  }
-
-  // Pre-configured AI briefing content for items
-  const aiBriefings: Record<string, { summary: string; actions: string[]; docs: string[] }> = {
-    'Weekly Product Sync': {
-      summary: 'Product design updates and Q3 milestones validation. Sally will present the revamped user engagement funnel and highlight the recent 12% drop in conversion rate during the trial period.',
-      actions: [
-        'Review the Figma file (Zenith V2) beforehand',
-        'Verify Q3 billing integration deadline with Engineering team',
-        'Address retention drops in onboarding stage'
-      ],
-      docs: ['Zenith Product Spec V2.pdf', 'Q3 Analytics Report.xlsx']
-    },
-    'Investor Outreach Session': {
-      summary: 'Strategy presentation to local venture partners at Soho House. Objective is to secure pre-commitments for Series A extension. Partner bio details emphasize focus on Fintech and Sub-Saharan logistics.',
-      actions: [
-        'Bring printed Pitch Deck and Executive Summary sheets',
-        'Prepare talking points on regional market expansion analytics',
-        'Highlight Coral-Beans integration capability'
-      ],
-      docs: ['NeverLate Pitch Deck May.pdf', 'Growth Projections Model.xlsx']
-    }
-  }
-
-  const activeDayEvents = weekEvents[selectedDay] || []
+  // Use today as default if available
+  const todayDay = new Date().toLocaleDateString('en-US', { weekday: 'short' }) as any;
+  const activeDayEvents = weekEvents[selectedDay] || [];
 
   if (loading) {
     return (
@@ -153,7 +133,7 @@ export default function Events({ isDark }: EventsProps) {
               <span className={`material-symbols-outlined text-[20px] ${isDark ? 'text-violet-400' : 'text-purple-600'}`}>calendar_view_week</span>
               Weekly Interactive Planner
             </h3>
-            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">May 2025</span>
+            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">{new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' })}</span>
           </div>
 
           {/* Week Grid */}
@@ -179,13 +159,14 @@ export default function Events({ isDark }: EventsProps) {
                 >
                   <span className={`text-xs font-semibold ${isActive ? 'font-bold' : 'text-slate-400'}`}>{day}</span>
                   <span className={`text-base font-bold mt-1 ${isDark && !isActive ? 'text-zinc-400' : ''}`}>
-                    {day === 'Mon' && '26'}
-                    {day === 'Tue' && '27'}
-                    {day === 'Wed' && '28'}
-                    {day === 'Thu' && '29'}
-                    {day === 'Fri' && '30'}
-                    {day === 'Sat' && '31'}
-                    {day === 'Sun' && '01'}
+                    {(() => {
+                      const today = new Date();
+                      const currentDayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(today.toLocaleDateString('en-US', { weekday: 'short' }));
+                      const targetDayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(day);
+                      let diff = targetDayIndex - currentDayIndex;
+                      const targetDate = new Date(today.getTime() + diff * 24 * 60 * 60 * 1000);
+                      return targetDate.getDate().toString().padStart(2, '0');
+                    })()}
                   </span>
                   
                   {/* Event Indicators */}
@@ -222,7 +203,7 @@ export default function Events({ isDark }: EventsProps) {
           }`}>
             <div className="flex justify-between items-center mb-4 pb-2 border-b border-dashed border-slate-200/60 dark:border-zinc-800">
               <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-violet-400' : 'text-purple-600'}`}>
-                {selectedDay === 'Wed' ? 'Wednesday, May 28 (Conflicts Found)' : `${selectedDay}'s Daily Timeline`}
+                {`${selectedDay}'s Daily Timeline`}
               </span>
               <span className="text-[10px] text-slate-400 font-semibold">
                 {activeDayEvents.length} scheduled event{activeDayEvents.length !== 1 ? 's' : ''}
@@ -314,6 +295,7 @@ export default function Events({ isDark }: EventsProps) {
         </section>
 
         {/* Airport Buffer & Commute Intelligence Map mockup */}
+        {activeDayEvents.some(e => e.isFlight) && (
         <section className={`p-6 rounded-2xl border shadow-sm relative overflow-hidden ${
           isDark ? 'bg-[#18181b] border-zinc-800' : 'bg-white border-slate-100'
         }`}>
@@ -357,7 +339,7 @@ export default function Events({ isDark }: EventsProps) {
               <div>
                 <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-violet-400' : 'text-purple-600'}`}>AI Smart Alert</p>
                 <p className={`text-[11px] font-bold mt-1 leading-normal ${isDark ? 'text-white' : 'text-slate-800'}`}>
-                  Departure trigger recommended at 12:45 PM to guarantee terminal check-in.
+                  Departure trigger recommended at least 2 hours before flight departure.
                 </p>
               </div>
               <button className={`mt-3 py-1.5 px-3 rounded-lg text-[10px] font-bold tracking-wide uppercase transition-all w-full text-center ${
@@ -370,6 +352,7 @@ export default function Events({ isDark }: EventsProps) {
             </div>
           </div>
         </section>
+        )}
 
       </div>
 
@@ -496,6 +479,7 @@ export default function Events({ isDark }: EventsProps) {
         </section>
 
         {/* Global time check / Travel summary widget */}
+        {timezones && timezones.length > 0 && (
         <section className={`p-6 rounded-2xl border shadow-sm ${
           isDark ? 'bg-[#18181b] border-zinc-800' : 'bg-white border-slate-100'
         }`}>
@@ -504,20 +488,15 @@ export default function Events({ isDark }: EventsProps) {
             Timezone Navigator
           </h4>
           <div className="space-y-3 text-xs">
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">London (Local)</span>
-              <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>08:28 AM BST</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">Nairobi (Flight destination)</span>
-              <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-850'}`}>10:28 AM EAT</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">New York (Investor HQ)</span>
-              <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-850'}`}>03:28 AM EDT</span>
-            </div>
+            {timezones.map((tz, i) => (
+              <div key={i} className="flex justify-between items-center">
+                <span className="text-slate-400 font-bold uppercase tracking-wider text-[9px]">{tz.label}</span>
+                <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{tz.timeStr}</span>
+              </div>
+            ))}
           </div>
         </section>
+        )}
 
       </div>
 
