@@ -52,7 +52,14 @@ const formatTime = (d: Date): string => {
 
 const getDayOfWeek = (d: Date): 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun' => {
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
-  return days[d.getDay()];
+  return days[d.getDay()] || 'Sun';
+};
+
+const getLocalDateString = (d: Date): string => {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 };
 
 const determineTypeAndIcon = (title: string, location: string) => {
@@ -122,7 +129,7 @@ export async function getEventsContext(): Promise<EventsContext> {
       title: row.summary || 'Untitled Event',
       time: `${formatTime(start)} - ${formatTime(end)}`,
       day: getDayOfWeek(start),
-      dateStr: start.toISOString().split('T')[0],
+      dateStr: getLocalDateString(start),
       startTime: start,
       endTime: end,
       type,
@@ -144,6 +151,7 @@ export async function getEventsContext(): Promise<EventsContext> {
     for (let j = i + 1; j < timelineEvents.length; j++) {
       const ev1 = timelineEvents[i];
       const ev2 = timelineEvents[j];
+      if (!ev1 || !ev2) continue;
       
       // Stop checking if ev2 starts after ev1 ends (since they are sorted)
       if (ev2.startTime >= ev1.endTime) break;
@@ -160,7 +168,7 @@ export async function getEventsContext(): Promise<EventsContext> {
   }
 
   // Calculate Widgets
-  const todayStr = now.toISOString().split('T')[0];
+  const todayStr = getLocalDateString(now);
   const todayEvents = timelineEvents.filter(e => e.dateStr === todayStr);
   const meetingLoad = todayEvents.length;
 
@@ -193,8 +201,9 @@ export async function getEventsContext(): Promise<EventsContext> {
   };
 
   timelineEvents.forEach(ev => {
-    if (weekEvents[ev.day]) {
-      weekEvents[ev.day].push(ev);
+    const list = weekEvents[ev.day];
+    if (list) {
+      list.push(ev);
     }
   });
 
@@ -243,8 +252,8 @@ export async function getEventsContext(): Promise<EventsContext> {
       
       aiBriefings[ev.title] = {
         summary: matchingEmails.length > 0 
-          ? `Found ${matchingEmails.length} relevant recent emails. ${matchingEmails[0].snippet}`
-          : `Upcoming ${ev.priority.toLowerCase()} priority event requires preparation.`,
+          ? `Found ${matchingEmails.length} relevant recent emails. ${matchingEmails[0]?.snippet || ""}`
+          : `Upcoming ${(ev.priority || 'low').toLowerCase()} priority event requires preparation.`,
         actions: actions.length > 0 ? actions : ["Review calendar attachments"],
         docs: matchingEmails.length > 0 ? ['Contextual Thread.pdf'] : []
       };

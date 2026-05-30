@@ -48,12 +48,19 @@ export interface EventPayload {
 }
 
 export default function Events({ isDark }: EventsProps) {
-  const [selectedDay, setSelectedDay] = useState<'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun'>('Wed')
+  // Use today as default if available
+  const todayDay = new Date().toLocaleDateString('en-US', { weekday: 'short' }) as any;
+  const defaultDay = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].includes(todayDay) ? todayDay : 'Wed';
+
+  const [selectedDay, setSelectedDay] = useState<'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun'>(defaultDay)
   const [expandedBriefing, setExpandedBriefing] = useState<string | null>(null)
   
-  const { data, loading } = useFetchWithFallback('http://localhost:3000/api/events', {
+  const { data, loading } = useFetchWithFallback<EventPayload>('http://localhost:3000/api/events', {
     stats: eventsStatsList,
-    nextUp: eventsNextUpList,
+    nextUp: eventsNextUpList as TimelineItem[],
+    weekEvents: {},
+    aiBriefings: {},
+    timezones: null
   });
 
   const displayStats = data?.stats || eventsStatsList;
@@ -61,10 +68,24 @@ export default function Events({ isDark }: EventsProps) {
   const aiBriefings: Record<string, AIBriefing> = data?.aiBriefings || {};
   const weekEvents: Record<string, TimelineItem[]> = data?.weekEvents || {};
   const timezones: TimezoneItem[] | null = data?.timezones || null;
+
+  const getWeekDayDateStr = (day: 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun'): string => {
+    const today = new Date();
+    const daysOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+    const currentDayIndex = daysOrder.indexOf(today.toLocaleDateString('en-US', { weekday: 'short' }) as any);
+    const targetDayIndex = daysOrder.indexOf(day);
+    let diff = targetDayIndex - currentDayIndex;
+    const targetDate = new Date(today.getTime() + diff * 24 * 60 * 60 * 1000);
+    
+    const yyyy = targetDate.getFullYear();
+    const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(targetDate.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
   
-  // Use today as default if available
-  const todayDay = new Date().toLocaleDateString('en-US', { weekday: 'short' }) as any;
-  const activeDayEvents = weekEvents[selectedDay] || [];
+  const activeDayEvents = (weekEvents[selectedDay] || []).filter(
+    (ev) => ev.dateStr === getWeekDayDateStr(selectedDay)
+  );
 
   if (loading) {
     return (
@@ -140,7 +161,9 @@ export default function Events({ isDark }: EventsProps) {
           <div className="grid grid-cols-7 gap-2 mb-6">
             {(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const).map((day) => {
               const isActive = selectedDay === day
-              const dayEvs = weekEvents[day] || []
+              const dayEvs = (weekEvents[day] || []).filter(
+                (ev) => ev.dateStr === getWeekDayDateStr(day)
+              );
               const hasConflict = dayEvs.some(e => e.conflict)
 
               return (
@@ -161,8 +184,9 @@ export default function Events({ isDark }: EventsProps) {
                   <span className={`text-base font-bold mt-1 ${isDark && !isActive ? 'text-zinc-400' : ''}`}>
                     {(() => {
                       const today = new Date();
-                      const currentDayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(today.toLocaleDateString('en-US', { weekday: 'short' }));
-                      const targetDayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(day);
+                      const daysOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+                      const currentDayIndex = daysOrder.indexOf(today.toLocaleDateString('en-US', { weekday: 'short' }) as any);
+                      const targetDayIndex = daysOrder.indexOf(day);
                       let diff = targetDayIndex - currentDayIndex;
                       const targetDate = new Date(today.getTime() + diff * 24 * 60 * 60 * 1000);
                       return targetDate.getDate().toString().padStart(2, '0');
@@ -407,7 +431,7 @@ export default function Events({ isDark }: EventsProps) {
                     {/* Participant Avatars */}
                     {item.avatars && item.avatars.length > 0 && (
                       <div className="flex -space-x-1.5 overflow-hidden">
-                        {item.avatars.map((av, avIdx) => (
+                        {item.avatars.map((av: string, avIdx: number) => (
                           <img
                             key={avIdx}
                             className="inline-block h-6 w-6 rounded-full ring-2 ring-white dark:ring-zinc-900 object-cover"

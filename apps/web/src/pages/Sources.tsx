@@ -106,7 +106,7 @@ export default function Sources({ isDark }: SourcesProps) {
       <footer className={`w-full py-6 border-t flex flex-wrap justify-between items-center bg-transparent mt-16 text-[9px] font-semibold text-slate-400 uppercase tracking-widest gap-4 ${
         isDark ? 'border-zinc-800' : 'border-slate-100'
       }`}>
-        <p>© 2024 NeverLate AI Intelligence</p>
+        <p>© {new Date().getFullYear()} NeverLate AI Intelligence</p>
         <div className="flex gap-6">
           <a className="hover:text-purple-600 transition-colors" href="#">Terms</a>
           <a className="hover:text-purple-600 transition-colors" href="#">Privacy</a>
