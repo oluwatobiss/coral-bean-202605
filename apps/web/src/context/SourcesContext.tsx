@@ -25,6 +25,7 @@ export function SourcesProvider({ children }: { children: React.ReactNode }) {
               ...src,
               connected: statusObj.connected && statusObj.enabled,
               email: statusObj.email || src.email,
+              userName: statusObj.name || src.userName,
               // Keep original connected flag just in case
               _coralConnected: statusObj.connected,
               _localEnabled: statusObj.enabled,
@@ -82,7 +83,8 @@ export function SourcesProvider({ children }: { children: React.ReactNode }) {
                 _coralConnected: true, 
                 _localEnabled: true, 
                 lastSync: 'Just now',
-                email: data.email || src.email
+                email: data.email || src.email,
+                userName: data.name || src.userName
               } : src
             ))
           } else {

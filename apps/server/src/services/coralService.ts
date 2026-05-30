@@ -219,24 +219,169 @@ export async function verifyCoralSource(tableName: string): Promise<boolean> {
   }
 }
 
-export async function getCoralUserEmail(): Promise<string | null> {
-  const cacheKey = "coral_user_email";
-  const cached = coralCache.get<string>(cacheKey);
+export async function getCoralUserProfile(): Promise<{ email: string; name: string } | null> {
+  const cacheKey = "coral_user_profile";
+  const cached = coralCache.get<{ email: string; name: string }>(cacheKey);
   if (cached) return cached;
 
   try {
     const rawData = await runCoralCommand<any[]>(
       "SELECT id FROM google_calendar.calendars WHERE primary = true LIMIT 1"
     );
-    if (rawData && rawData.length > 0 && rawData[0].id) {
-      const email = rawData[0].id;
-      coralCache.set(cacheKey, email);
-      return email;
+    if (!rawData || rawData.length === 0 || !rawData[0].id) {
+      return null;
     }
-    return null;
+    const email = rawData[0].id;
+    let name = email.split('@')[0].split(/[._-]/).map((part: string) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+
+    try {
+      const recentEmails = await runCoralCommand<any[]>("SELECT id FROM gmail.emails LIMIT 10");
+      if (recentEmails && recentEmails.length > 0) {
+        for (const row of recentEmails) {
+          if (!row.id) continue;
+          const details = await runCoralCommand<any[]>(
+            `SELECT payload FROM gmail.message WHERE id = '${row.id}' LIMIT 1`
+          );
+          if (details && details.length > 0 && details[0].payload) {
+            const payload = typeof details[0].payload === 'string'
+              ? JSON.parse(details[0].payload)
+              : details[0].payload;
+            
+            if (payload && payload.headers && Array.isArray(payload.headers)) {
+              const fromHeader = payload.headers.find((h: any) => h.name && h.name.toLowerCase() === 'from');
+              const toHeader = payload.headers.find((h: any) => h.name && h.name.toLowerCase() === 'to');
+              
+              const checkHeader = (val: string) => {
+                if (val && val.includes(email)) {
+                  const match = val.match(/^(?:"?([^"]*)"?\s*)?<([^>]+)>/) || val.match(/^([^<]+)/);
+                  if (match && match[1]) {
+                    const parsedName = match[1].trim();
+                    if (parsedName && parsedName !== email && !parsedName.includes('@')) {
+                      return parsedName;
+                    }
+                  }
+                }
+                return null;
+              };
+
+              if (fromHeader) {
+                const found = checkHeader(fromHeader.value);
+                if (found) { name = found; break; }
+              }
+              if (toHeader) {
+                const found = checkHeader(toHeader.value);
+                if (found) { name = found; break; }
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.log("Could not resolve dynamic user display name from email headers:", e);
+    }
+
+    const profile = { email, name };
+    coralCache.set(cacheKey, profile);
+    return profile;
   } catch (error) {
-    console.log("Failed to fetch Coral user email:", error);
+    console.log("Failed to fetch Coral user profile:", error);
     return null;
+  }
+}
+
+export async function getCoralUserEmail(): Promise<string | null> {
+  const profile = await getCoralUserProfile();
+  return profile ? profile.email : null;
+}
+
+export async function getPriorityReminders(): Promise<any[]> {
+  try {
+    const [emails, events] = await Promise.all([
+      getRecentEmails(),
+      getUpcomingEvents()
+    ]);
+
+    const reminders: any[] = [];
+
+    // 1. Process Calendar Events
+    for (const event of events) {
+      const title = event.title || "";
+      const lowerTitle = title.toLowerCase();
+      
+      let priority = "";
+      let color = "";
+
+      if (lowerTitle.includes("deadline") || lowerTitle.includes("due") || lowerTitle.includes("urgent") || lowerTitle.includes("interview") || lowerTitle.includes("alert")) {
+        priority = "High";
+        color = "text-red-400 bg-red-500/10";
+      } else if (lowerTitle.includes("review") || lowerTitle.includes("sync") || lowerTitle.includes("meeting") || lowerTitle.includes("call")) {
+        priority = "Medium";
+        color = "text-amber-400 bg-amber-500/10";
+      } else {
+        priority = "Low";
+        color = "text-emerald-400 bg-emerald-500/10";
+      }
+
+      const dateStr = event.start ? new Date(event.start).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Upcoming";
+
+      reminders.push({
+        title: `Calendar: ${title}`,
+        date: dateStr,
+        priority,
+        color
+      });
+    }
+
+    // 2. Process Emails
+    for (const email of emails) {
+      const subject = email.subject || "";
+      const lowerSubject = subject.toLowerCase();
+      const snippet = email.snippet || "";
+      const lowerSnippet = snippet.toLowerCase();
+
+      let priority = "";
+      let color = "";
+
+      if (email.priority === "High" || (email.labels && email.labels.includes("IMPORTANT")) || lowerSubject.includes("urgent") || lowerSubject.includes("action required") || lowerSubject.includes("due") || lowerSubject.includes("payment")) {
+        priority = "High";
+        color = "text-red-400 bg-red-500/10";
+      } else if (email.priority === "Medium" || lowerSubject.includes("sync") || lowerSubject.includes("review") || lowerSnippet.includes("deadline")) {
+        priority = "Medium";
+        color = "text-amber-400 bg-amber-500/10";
+      } else {
+        priority = "Low";
+        color = "text-emerald-400 bg-emerald-500/10";
+      }
+
+      const dateStr = email.date ? new Date(email.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Today";
+
+      reminders.push({
+        title: `Email: ${subject}`,
+        date: dateStr,
+        priority,
+        color
+      });
+    }
+
+    // Sort reminders so High priority is first, then Medium, then Low
+    const priorityWeight: Record<string, number> = { "High": 3, "Medium": 2, "Low": 1 };
+    reminders.sort((a, b) => (priorityWeight[b.priority] || 0) - (priorityWeight[a.priority] || 0));
+
+    // Fallback if none found
+    if (reminders.length === 0) {
+      return [
+        { title: "Review scheduled sync feeds", date: "Today", priority: "Medium", color: "text-amber-400 bg-amber-500/10" },
+        { title: "Welcome to NeverLate Agent workspace", date: "Today", priority: "Low", color: "text-emerald-400 bg-emerald-500/10" }
+      ];
+    }
+
+    return reminders.slice(0, 5); // Limit to top 5 reminders
+  } catch (error) {
+    console.log("Failed to fetch priority reminders from Coral:", error);
+    return [
+      { title: "Passport renewal deadline", date: "July 24, 2025", priority: "High", color: "text-red-400 bg-red-500/10" },
+      { title: "Project 'Zenith' Deliverable", date: "May 30, 2025", priority: "Medium", color: "text-amber-400 bg-amber-500/10" }
+    ];
   }
 }
 

@@ -21,6 +21,7 @@ export interface SourceStream {
   name: string;
   desc: string;
   email?: string;
+  userName?: string;
   lastSync: string;
   connected: boolean;
   icon: string;

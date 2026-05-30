@@ -3,7 +3,7 @@ import express, { type Request, type Response } from "express";
 import cors from "cors";
 import path from "path";
 import { processDashboardData, processChat, getActiveNotifications } from "./ai/aiEngine.ts";
-import { getRecentEmails, getUpcomingEvents, verifyCoralSource, getCoralUserEmail } from "./services/coralService.ts";
+import { getRecentEmails, getUpcomingEvents, verifyCoralSource, getCoralUserProfile } from "./services/coralService.ts";
 import { getPreferences, updatePreference } from "./utils/preferences.ts";
 // --- New REST Endpoints for Demo Data ---
 // These endpoints load from the shared mockData file to preserve hackathon velocity and demo reliability
@@ -71,16 +71,21 @@ app.get("/api/sources/status", async (req, res) => {
     ]);
 
     let email: string | null = null;
+    let name: string | null = null;
     if (gmailConnected || calendarConnected) {
-      email = await getCoralUserEmail();
+      const profile = await getCoralUserProfile();
+      if (profile) {
+        email = profile.email;
+        name = profile.name;
+      }
     }
 
     res.json({
-      gmail: { connected: gmailConnected, enabled: prefs.gmail_enabled, email: email || undefined },
-      calendar: { connected: calendarConnected, enabled: prefs.google_calendar_enabled, email: email || undefined },
+      gmail: { connected: gmailConnected, enabled: prefs.gmail_enabled, email: email || undefined, name: name || undefined },
+      calendar: { connected: calendarConnected, enabled: prefs.google_calendar_enabled, email: email || undefined, name: name || undefined },
       slack: { connected: false, enabled: false },
-      drive: { connected: false, enabled: false, email: email || undefined },
-      keep: { connected: false, enabled: false, email: email || undefined }
+      drive: { connected: false, enabled: false, email: email || undefined, name: name || undefined },
+      keep: { connected: false, enabled: false, email: email || undefined, name: name || undefined }
     });
   } catch (error) {
     console.error("Error fetching source status", error);
@@ -104,9 +109,15 @@ app.post("/api/sources/connect", async (req, res) => {
     // Force enabled to true since the user actively verified it
     updatePreference(`${sourceId}_enabled` as any, true);
 
-    const email = await getCoralUserEmail();
+    const profile = await getCoralUserProfile();
 
-    res.json({ success: true, connected: true, enabled: true, email: email || undefined });
+    res.json({ 
+      success: true, 
+      connected: true, 
+      enabled: true, 
+      email: profile?.email || undefined, 
+      name: profile?.name || undefined 
+    });
   } catch (error) {
     console.error("Error verifying source connection", error);
     res.status(500).json({ error: "Verification failed" });

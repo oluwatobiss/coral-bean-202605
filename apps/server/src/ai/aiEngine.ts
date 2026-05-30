@@ -1,5 +1,6 @@
 import { buildTimeline } from "./heuristicEngine.ts";
 import { mcpRegistry } from "../mcp/registry.ts";
+import { getPriorityReminders } from "../services/coralService.ts";
 
 export async function processDashboardData() {
   const [
@@ -8,14 +9,16 @@ export async function processDashboardData() {
     { focusScore, upcomingMeetings, importantEmails, conflicts, recommendation },
     { risks },
     { conflicts: scheduleConflicts },
-    { issues }
+    { issues },
+    reminders
   ] = await Promise.all([
     mcpRegistry.get_dashboard_context.execute(),
     mcpRegistry.get_daily_briefing.execute(),
     mcpRegistry.get_productivity_summary.execute(),
     mcpRegistry.get_high_risk_commitments.execute(),
     mcpRegistry.get_upcoming_conflicts.execute(),
-    mcpRegistry.get_travel_issues.execute()
+    mcpRegistry.get_travel_issues.execute(),
+    getPriorityReminders()
   ]);
 
   const allInsights = [...risks, ...scheduleConflicts, ...issues];
@@ -25,6 +28,7 @@ export async function processDashboardData() {
     summary: briefing,
     insights: allInsights.slice(0, 4), // Top 4
     timeline,
+    reminders,
     metrics: [
       { title: 'Focus Score', value: `${focusScore}`, desc: 'Optimal', icon: 'center_focus_strong', lightColor: 'bg-emerald-100 text-emerald-600', darkColor: 'bg-emerald-500/20 text-emerald-400' },
       { title: 'Meeting Load', value: `${upcomingMeetings}`, desc: 'Events Today', icon: 'event_busy', lightColor: 'bg-amber-100 text-amber-600', darkColor: 'bg-amber-500/20 text-amber-400' },

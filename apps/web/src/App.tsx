@@ -2,7 +2,6 @@ import { useState } from "react";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import Dashboard from "./pages/Dashboard";
-import Dashboard2 from "./pages/Dashboard2";
 import Insights from "./pages/Insights";
 import AIChat from "./pages/AIChat";
 import Sources from "./pages/Sources";
@@ -20,8 +19,6 @@ export default function App() {
     switch (activePage) {
       case "dashboard":
         return <Dashboard setActivePage={setActivePage} isDark={isDark} />;
-      case "dashboard2":
-        return <Dashboard2 setActivePage={setActivePage} isDark={isDark} />;
       case "events":
         return <Events isDark={isDark} />;
       case "reminders":

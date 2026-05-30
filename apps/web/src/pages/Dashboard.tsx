@@ -17,14 +17,36 @@ export default function Dashboard({ setActivePage, isDark }: DashboardProps) {
 
   const gmailSource = sources.find(s => s.id === 'gmail');
   const userEmail = gmailSource?.email || 'alex@gmail.com';
-  const userName = userEmail !== 'alex@gmail.com' 
+  const userName = gmailSource?.userName || (userEmail !== 'alex@gmail.com' 
     ? userEmail.split('@')[0].split(/[._-]/).map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ') 
-    : 'Alex';
+    : 'Alex');
+
+  const defaultReminders = [
+    {
+      title: "Passport renewal",
+      date: "July 24, 2025",
+      priority: "High",
+      color: isDark ? "text-red-400 bg-red-500/10" : "text-red-500 bg-red-50",
+    },
+    {
+      title: "Project deadline",
+      date: "May 30, 2025",
+      priority: "Medium",
+      color: isDark ? "text-amber-400 bg-amber-500/10" : "text-amber-500 bg-amber-50",
+    },
+    {
+      title: "Submit expense report",
+      date: "May 28, 2025",
+      priority: "Low",
+      color: isDark ? "text-emerald-400 bg-emerald-500/10" : "text-emerald-500 bg-emerald-50",
+    },
+  ];
 
   const { data, loading } = useFetchWithFallback('http://localhost:3000/api/ai/dashboard', {
     metrics: dashboardKpis,
     insights: dashboardInsights,
     timeline: dashboardAgenda,
+    reminders: defaultReminders
   });
 
   const displayKpis = data?.metrics || dashboardKpis;
@@ -41,6 +63,7 @@ export default function Dashboard({ setActivePage, isDark }: DashboardProps) {
   }));
 
   const displayAgenda = data?.timeline || dashboardAgenda;
+  const displayReminders = data?.reminders || defaultReminders;
 
   if (loading) {
     return (
@@ -391,28 +414,7 @@ export default function Dashboard({ setActivePage, isDark }: DashboardProps) {
           </div>
 
           <div className="space-y-2.5">
-            {[
-              {
-                title: "Passport renewal",
-                date: "July 24, 2025",
-                priority: "High",
-                color: isDark ? "text-red-400 bg-red-500/10" : "text-red-500 bg-red-50",
-              },
-              {
-                title: "Project deadline",
-                date: "May 30, 2025",
-                priority: "Medium",
-                color: isDark ? "text-amber-400 bg-amber-500/10" : "text-amber-500 bg-amber-50",
-              },
-              {
-                title: "Submit expense report",
-                date: "May 28, 2025",
-                priority: "Low",
-                color: isDark
-                  ? "text-emerald-400 bg-emerald-500/10"
-                  : "text-emerald-500 bg-emerald-50",
-              },
-            ].map((rem, idx) => (
+            {displayReminders.map((rem: any, idx: number) => (
               <div
                 key={idx}
                 className={`p-3 rounded-xl flex items-center justify-between border transition-colors ${

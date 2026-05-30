@@ -14,9 +14,9 @@ export default function Header({ activePage, setActivePage, isDark, setIsDark }:
   const { sources } = useSources();
   const gmailSource = sources.find(s => s.id === 'gmail');
   const userEmail = gmailSource?.email || 'alex@gmail.com';
-  const userName = userEmail !== 'alex@gmail.com' 
+  const userName = gmailSource?.userName || (userEmail !== 'alex@gmail.com' 
     ? userEmail.split('@')[0].split(/[._-]/).map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ') 
-    : 'Alex';
+    : 'Alex');
 
   const [notifCount, setNotifCount] = useState(0)
 
