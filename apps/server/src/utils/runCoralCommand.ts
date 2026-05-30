@@ -1,12 +1,19 @@
 import { exec } from "child_process";
 import { promisify } from "util";
+import os from "os";
 
 const execAsync = promisify(exec);
 
 export async function runCoralCommand<T>(query: string): Promise<T> {
+  const isWindows = process.platform === "win32";
   const distro = process.env.WSL_DISTRO || "Ubuntu";
   const user = process.env.WSL_USER || "shazil_parwez";
-  const coralBin = process.env.CORAL_BIN || `/home/${user}/.local/bin/coral`;
+
+  const defaultCoralBin = isWindows
+    ? `/home/${user}/.local/bin/coral`
+    : `${os.homedir()}/.local/bin/coral`;
+
+  const coralBin = process.env.CORAL_BIN || defaultCoralBin;
   const isDebug = process.env.CORAL_DEBUG === "true";
 
   // Note: we wrap the query in double quotes for the command line.
@@ -14,11 +21,21 @@ export async function runCoralCommand<T>(query: string): Promise<T> {
   // Replacing internal double quotes with single quotes if any.
   const safeQuery = query.replace(/"/g, "'");
 
-  const command = `wsl -d ${distro} -u ${user} -- ${coralBin} sql --format json "${safeQuery}"`;
+  let command: string;
+  if (isWindows) {
+    command = `wsl -d ${distro} -u ${user} -- ${coralBin} sql --format json "${safeQuery}"`;
+  } else {
+    command = `${coralBin} sql --format json "${safeQuery}"`;
+  }
 
   if (isDebug) {
     console.log("=== Coral Execution Diagnostics ===");
-    const diagnosticsCmd = `wsl -d ${distro} -u ${user} -- bash -c 'whoami; echo "$HOME"; echo "$PATH"; which coral || echo not_found; pwd; ls -la "$(dirname ${coralBin})" || true'`;
+    let diagnosticsCmd: string;
+    if (isWindows) {
+      diagnosticsCmd = `wsl -d ${distro} -u ${user} -- bash -c 'whoami; echo "$HOME"; echo "$PATH"; which coral || echo not_found; pwd; ls -la "$(dirname ${coralBin})" || true'`;
+    } else {
+      diagnosticsCmd = `whoami; echo "$HOME"; echo "$PATH"; which coral || echo not_found; pwd; ls -la "$(dirname ${coralBin})" || true`;
+    }
     try {
       const diag = await execAsync(diagnosticsCmd);
       console.log("Diagnostics STDOUT:\n", diag.stdout);
@@ -60,15 +77,26 @@ export async function runCoralCommand<T>(query: string): Promise<T> {
     const data = JSON.parse(stdout.trim());
     return data as T;
   } catch (error) {
+    const rawErrStr = error instanceof Error ? error.message : String(error);
+    const cleanedErrStr = cleanErrorMessage(rawErrStr);
+
     if (isDebug) {
       console.error("Failed to execute Coral command:", command);
-      console.error("Error specifics:", error);
+      console.error("Error specifics:", cleanedErrStr);
     }
-    const errStr = String(error);
-    if (!isDebug && !(errStr.includes("ENOENT") || errStr.includes("not found") || errStr.includes("not recognized"))) {
-      console.error("Failed to execute Coral command:", command);
-      console.error(error);
+    const isMissingCli = cleanedErrStr.includes("ENOENT") || cleanedErrStr.includes("not found") || cleanedErrStr.includes("not recognized");
+    if (!isDebug && !isMissingCli) {
+      console.error(`Failed to execute Coral command: ${cleanedErrStr}`);
     }
-    throw new Error(`Coral command execution failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(cleanedErrStr);
   }
+}
+
+function cleanErrorMessage(msg: string): string {
+  // Regex to match the tokio-rt-worker panic trace block
+  const tokioPanicRegex = /thread 'tokio-rt-worker'[\s\S]*?backtrace\n?/gi;
+  let cleaned = msg.replace(tokioPanicRegex, "");
+  // Clean up duplicate/excessive newlines
+  cleaned = cleaned.replace(/\n{2,}/g, "\n");
+  return cleaned.trim();
 }

@@ -19,6 +19,10 @@ export interface TimelineItem {
   hasBriefing?: boolean;
   icon?: string;
   avatars?: string[];
+  isGmail?: boolean;
+  sender?: string;
+  snippet?: string;
+  labels?: string[];
 }
 
 export interface AIBriefing {
@@ -38,6 +42,7 @@ export interface EventsContext {
   nextUp: TimelineItem[];
   aiBriefings: Record<string, AIBriefing>;
   timezones: TimezoneItem[] | null;
+  gmailEvents: any[];
 }
 
 const parseCoralDate = (dateStr: string | null): Date | null => {
@@ -52,10 +57,21 @@ const formatTime = (d: Date): string => {
 
 const getDayOfWeek = (d: Date): 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun' => {
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
-  return days[d.getDay()];
+  return days[d.getDay()] || 'Sun';
 };
 
-const determineTypeAndIcon = (title: string, location: string) => {
+const getLocalDateString = (d: Date): string => {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const determineTypeAndIcon = (title: string, location: string, row?: any) => {
+  if (row?.isHoliday) return { type: 'Holiday', icon: 'celebration' };
+  if (row?.isFamily) return { type: 'Family', icon: 'favorite' };
+  if (row?.isClassroom) return { type: 'Class', icon: 'school' };
+
   const lowerTitle = title.toLowerCase();
   const lowerLoc = (location || '').toLowerCase();
   
@@ -68,15 +84,42 @@ const determineTypeAndIcon = (title: string, location: string) => {
 };
 
 export async function getEventsContext(): Promise<EventsContext> {
-  let calendarRaw: any[] = [];
-  let emailRaw: any[] = [];
+  let calendars: any[] = [];
   try {
-    calendarRaw = await runCoralCommand<any[]>(
-      `SELECT summary, start_date_time, end_date_time, location, event_type, attendees_emails FROM google_calendar.events WHERE start_date_time IS NOT NULL ORDER BY start_date_time ASC LIMIT 100`
+    calendars = await runCoralCommand<any[]>(
+      `SELECT id, summary FROM google_calendar.calendars`
     ) || [];
   } catch (e) {
-    console.error("Failed to fetch calendar events:", e);
+    console.error("Failed to fetch calendars:", e);
+    calendars = [{ id: 'primary', summary: 'Primary' }];
   }
+
+  let calendarRaw: any[] = [];
+  let emailRaw: any[] = [];
+
+  // Fetch events from all calendars in parallel
+  await Promise.all(calendars.map(async (cal) => {
+    try {
+      const safeId = cal.id.replace(/#/g, '%23');
+      const events = await runCoralCommand<any[]>(
+        `SELECT summary, start_date_time, end_date_time, start_date, end_date, location, event_type, attendees_emails FROM google_calendar.events WHERE calendar_id = '${safeId}' LIMIT 50`
+      ) || [];
+      
+      const isHolidayCal = cal.summary.toLowerCase().includes('holiday') || cal.id.includes('holiday');
+      const isFamilyCal = cal.summary.toLowerCase().includes('family') || cal.id.includes('family');
+      const isClassroomCal = cal.summary.toLowerCase().includes('classroom') || cal.id.includes('classroom');
+      
+      events.forEach((row) => {
+        row.calendarName = cal.summary;
+        row.isHoliday = isHolidayCal;
+        row.isFamily = isFamilyCal;
+        row.isClassroom = isClassroomCal;
+        calendarRaw.push(row);
+      });
+    } catch (err) {
+      console.error(`Failed to fetch events for calendar ${cal.id}:`, err);
+    }
+  }));
 
   try {
     emailRaw = await getRecentEmails() || [];
@@ -92,14 +135,21 @@ export async function getEventsContext(): Promise<EventsContext> {
   let timelineEvents: TimelineItem[] = [];
 
   calendarRaw.forEach((row, i) => {
-    const start = parseCoralDate(row.start_date_time);
-    const end = parseCoralDate(row.end_date_time) || start;
+    let start = parseCoralDate(row.start_date_time);
+    let end = parseCoralDate(row.end_date_time);
+    const isAllDay = !start && !!row.start_date;
+
+    if (isAllDay) {
+      start = new Date(`${row.start_date}T00:00:00`);
+      end = row.end_date ? new Date(`${row.end_date}T23:59:59`) : new Date(`${row.start_date}T23:59:59`);
+    }
+
     if (!start || !end) return;
     
     // Filter out very old/far future events
     if (start < minDate || start > maxDate) return;
 
-    const { type, icon } = determineTypeAndIcon(row.summary || 'Untitled Event', row.location || '');
+    const { type, icon } = determineTypeAndIcon(row.summary || 'Untitled Event', row.location || '', row);
     let status: 'completed' | 'critical' | 'upcoming' = 'upcoming';
     if (end < now) {
       status = 'completed';
@@ -118,21 +168,68 @@ export async function getEventsContext(): Promise<EventsContext> {
     }
 
     timelineEvents.push({
-      id: `ev-${i}`,
+      id: `ev-${i}-${Math.random().toString(36).substr(2, 5)}`,
       title: row.summary || 'Untitled Event',
-      time: `${formatTime(start)} - ${formatTime(end)}`,
+      time: isAllDay ? 'All Day' : `${formatTime(start)} - ${formatTime(end)}`,
       day: getDayOfWeek(start),
-      dateStr: start.toISOString().split('T')[0],
+      dateStr: getLocalDateString(start),
       startTime: start,
       endTime: end,
       type,
       status,
-      location: row.location || 'Virtual',
+      location: row.location || (row.isHoliday ? row.calendarName : 'Virtual'),
       isFlight,
       priority,
       icon,
       hasBriefing: false,
       avatars: []
+    });
+  });
+
+  // Merge Gmail messages as TimelineItems directly inside the Weekly Interactive Planner
+  emailRaw.forEach((row, i) => {
+    const start = parseCoralDate(row.date) || parseCoralDate(row.timestamp) || now;
+    // Gmail events don't block calendar time, so make duration short (e.g., 30 mins)
+    const end = new Date(start.getTime() + 30 * 60 * 1000);
+    
+    if (start < minDate || start > maxDate) return;
+
+    const type = 'Email';
+    const icon = 'mail';
+    let status: 'completed' | 'critical' | 'upcoming' = 'completed';
+    
+    // If it arrived today, make it completed or critical/upcoming based on time
+    if (start > now) {
+      status = 'upcoming';
+    }
+
+    let priority = "LOW";
+    if (row.priority === "High" || (row.labels && row.labels.includes("IMPORTANT"))) {
+      priority = "HIGH";
+    } else if (row.priority === "Medium") {
+      priority = "MEDIUM";
+    }
+
+    timelineEvents.push({
+      id: row.id || `gmail-ev-${i}`,
+      title: `Email: ${row.subject || 'No Subject'}`,
+      time: `${formatTime(start)}`, // Clean timestamp
+      day: getDayOfWeek(start),
+      dateStr: getLocalDateString(start),
+      startTime: start,
+      endTime: end,
+      type,
+      status,
+      location: row.sender || row.from || 'Unknown Sender',
+      isFlight: false,
+      priority,
+      icon,
+      hasBriefing: false,
+      avatars: [],
+      isGmail: true,
+      sender: row.sender || row.from || 'Unknown Sender',
+      snippet: row.snippet || '',
+      labels: row.labels || []
     });
   });
 
@@ -144,9 +241,16 @@ export async function getEventsContext(): Promise<EventsContext> {
     for (let j = i + 1; j < timelineEvents.length; j++) {
       const ev1 = timelineEvents[i];
       const ev2 = timelineEvents[j];
+      if (!ev1 || !ev2) continue;
       
       // Stop checking if ev2 starts after ev1 ends (since they are sorted)
       if (ev2.startTime >= ev1.endTime) break;
+
+      // Skip conflict checking if either is an Email/Gmail entry, or an all-day event, or a holiday/family/class event!
+      if (ev1.type === 'Email' || ev2.type === 'Email') continue;
+      if (ev1.time === 'All Day' || ev2.time === 'All Day') continue;
+      if (ev1.type === 'Holiday' || ev2.type === 'Holiday') continue;
+      if (ev1.type === 'Family' || ev2.type === 'Family') continue;
 
       if (ev1.status !== 'completed' && ev2.status !== 'completed') {
         ev1.conflict = true;
@@ -160,7 +264,7 @@ export async function getEventsContext(): Promise<EventsContext> {
   }
 
   // Calculate Widgets
-  const todayStr = now.toISOString().split('T')[0];
+  const todayStr = getLocalDateString(now);
   const todayEvents = timelineEvents.filter(e => e.dateStr === todayStr);
   const meetingLoad = todayEvents.length;
 
@@ -193,8 +297,9 @@ export async function getEventsContext(): Promise<EventsContext> {
   };
 
   timelineEvents.forEach(ev => {
-    if (weekEvents[ev.day]) {
-      weekEvents[ev.day].push(ev);
+    const list = weekEvents[ev.day];
+    if (list) {
+      list.push(ev);
     }
   });
 
@@ -243,8 +348,8 @@ export async function getEventsContext(): Promise<EventsContext> {
       
       aiBriefings[ev.title] = {
         summary: matchingEmails.length > 0 
-          ? `Found ${matchingEmails.length} relevant recent emails. ${matchingEmails[0].snippet}`
-          : `Upcoming ${ev.priority.toLowerCase()} priority event requires preparation.`,
+          ? `Found ${matchingEmails.length} relevant recent emails. ${matchingEmails[0]?.snippet || ""}`
+          : `Upcoming ${(ev.priority || 'low').toLowerCase()} priority event requires preparation.`,
         actions: actions.length > 0 ? actions : ["Review calendar attachments"],
         docs: matchingEmails.length > 0 ? ['Contextual Thread.pdf'] : []
       };
@@ -262,6 +367,7 @@ export async function getEventsContext(): Promise<EventsContext> {
     stats,
     nextUp,
     aiBriefings,
-    timezones
+    timezones,
+    gmailEvents: emailRaw
   };
 }

@@ -212,7 +212,10 @@ export async function verifyCoralSource(tableName: string): Promise<boolean> {
     await runCoralCommand<any[]>(`SELECT 1 FROM ${tableName} LIMIT 1`);
     return true;
   } catch (error) {
-    console.log(`Failed to verify Coral source ${tableName}:`, error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const shortMsg = errMsg.split('\n').find(line => line.startsWith('Error:')) || errMsg.split('\n')[0];
+    console.log(`Failed to verify Coral source ${tableName}: ${shortMsg}`);
+    
     // For demo/fallback purposes when coral CLI is entirely missing, we assume true if fallback is needed,
     // but the strict architecture requires returning false. Since the user wants to see "Connect" and "Disable" 
     // functionality locally, we will mock the return for the demo if the error is "spawn coral ENOENT" or "not recognized".
@@ -283,7 +286,9 @@ export async function getCoralUserProfile(): Promise<{ email: string; name: stri
         }
       }
     } catch (e) {
-      console.log("Could not resolve dynamic user display name from email headers:", e);
+      const errMsg = e instanceof Error ? e.message : String(e);
+      const shortMsg = errMsg.split('\n').find(line => line.startsWith('Error:')) || errMsg.split('\n')[0];
+      console.log(`Could not resolve dynamic user display name from email headers: ${shortMsg}`);
     }
 
     let avatarUrl: string | null = null;
@@ -299,14 +304,18 @@ export async function getCoralUserProfile(): Promise<{ email: string; name: stri
          }
       }
     } catch (e) {
-       console.log("Could not fetch avatar from google_profile (missing scope or source):", e);
+       const errMsg = e instanceof Error ? e.message : String(e);
+       const shortMsg = errMsg.split('\n').find(line => line.startsWith('Error:')) || errMsg.split('\n')[0];
+       console.log(`Could not fetch avatar from google_profile (missing scope or source): ${shortMsg}`);
     }
 
     const profile = { email, name, avatarUrl };
     coralCache.set(cacheKey, profile);
     return profile;
   } catch (error) {
-    console.log("Failed to fetch Coral user profile:", error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const shortMsg = errMsg.split('\n').find(line => line.startsWith('Error:')) || errMsg.split('\n')[0];
+    console.log(`Failed to fetch Coral user profile: ${shortMsg}`);
     return null;
   }
 }

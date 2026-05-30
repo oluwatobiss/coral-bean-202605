@@ -269,7 +269,18 @@ export default function Settings({ isDark }: SettingsProps) {
                 </div>
                 <div>
                   <h4 className={`text-sm font-bold ${isDark ? 'text-violet-400' : 'text-purple-600'}`}>Pro Subscription Active</h4>
-                  <p className="text-xs text-slate-400 mt-0.5 font-semibold">Your next billing date is December 14, 2024.</p>
+                  <p className="text-xs text-slate-400 mt-0.5 font-semibold">
+                    Your next billing date is {(() => {
+                      const billingDate = new Date();
+                      billingDate.setMonth(billingDate.getMonth() + 1);
+                      billingDate.setDate(14);
+                      return billingDate.toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric"
+                      });
+                    })()}.
+                  </p>
                 </div>
               </div>
               <button className={`px-4 py-2 border text-xs font-bold rounded-xl transition-all active:scale-[0.98] ${
@@ -306,7 +317,7 @@ export default function Settings({ isDark }: SettingsProps) {
       <footer className={`w-full py-6 border-t flex flex-wrap justify-between items-center bg-transparent mt-16 text-[9px] font-semibold text-slate-400 uppercase tracking-widest gap-4 ${
         isDark ? 'border-zinc-800' : 'border-slate-100'
       }`}>
-        <p>© 2024 NeverLate AI Intelligence</p>
+        <p>© {new Date().getFullYear()} NeverLate AI Intelligence</p>
         <div className="flex gap-6">
           <a className="hover:text-purple-600 transition-colors" href="#">Terms</a>
           <a className="hover:text-purple-600 transition-colors" href="#">Privacy</a>

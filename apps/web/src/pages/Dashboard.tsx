@@ -24,19 +24,31 @@ export default function Dashboard({ setActivePage, isDark }: DashboardProps) {
   const defaultReminders = [
     {
       title: "Passport renewal",
-      date: "July 24, 2025",
+      date: new Date(Date.now() + 55 * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      }),
       priority: "High",
       color: isDark ? "text-red-400 bg-red-500/10" : "text-red-500 bg-red-50",
     },
     {
       title: "Project deadline",
-      date: "May 30, 2025",
+      date: new Date().toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      }),
       priority: "Medium",
       color: isDark ? "text-amber-400 bg-amber-500/10" : "text-amber-500 bg-amber-50",
     },
     {
       title: "Submit expense report",
-      date: "May 28, 2025",
+      date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      }),
       priority: "Low",
       color: isDark ? "text-emerald-400 bg-emerald-500/10" : "text-emerald-500 bg-emerald-50",
     },
@@ -62,7 +74,20 @@ export default function Dashboard({ setActivePage, isDark }: DashboardProps) {
     darkColor: item.darkColor || 'text-blue-400 bg-blue-500/10'
   }));
 
-  const displayAgenda = data?.timeline || dashboardAgenda;
+  const displayAgenda = (data?.timeline || dashboardAgenda).filter((item: any) => {
+    // Treat fallback items without a date as "today's agenda" items
+    if (!item.dateObj && !item.date) {
+      return true;
+    }
+    const dateToParse = item.dateObj || item.date;
+    try {
+      const itemDate = new Date(dateToParse);
+      const today = new Date();
+      return itemDate.toDateString() === today.toDateString();
+    } catch (e) {
+      return true;
+    }
+  });
   const displayReminders = data?.reminders || defaultReminders;
 
   if (loading) {
@@ -350,47 +375,58 @@ export default function Dashboard({ setActivePage, isDark }: DashboardProps) {
               Today's Agenda
             </h4>
             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-              May 25, 2025
+              {new Date().toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric"
+              })}
             </span>
           </div>
 
           <div
-            className={`space-y-6 relative before:absolute before:left-[4px] before:top-2 before:bottom-2 before:w-[1.5px] ${
+            className={`space-y-6 relative ${displayAgenda.length > 0 ? 'before:absolute before:left-[4px] before:top-2 before:bottom-2 before:w-[1.5px]' : ''} ${
               isDark ? "before:bg-zinc-800" : "before:bg-slate-100"
             }`}
           >
-            {displayAgenda.map((item: any, idx: number) => (
-              <div
-                key={idx}
-                className="flex relative pl-5 animate-in fade-in slide-in-from-left-2 duration-300"
-              >
-                <div
-                  className={`absolute left-0 top-[5px] w-2 h-2 rounded-full ${isDark ? (item.dotColorDark || 'bg-violet-500') : (item.dotColorLight || 'bg-purple-600')} shadow-[0_0_8px_rgba(124,58,237,0.3)]`}
-                />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`text-[10px] font-bold ${isDark ? "text-violet-400" : "text-purple-600"}`}
-                    >
-                      {item.time}
-                    </span>
-                    {item.isFlight && (
-                      <span
-                        className={`material-symbols-outlined text-[14px] rotate-45 ${isDark ? "text-violet-400" : "text-purple-500"}`}
-                      >
-                        flight
-                      </span>
-                    )}
-                  </div>
-                  <p
-                    className={`text-xs font-bold mt-0.5 ${isDark ? "text-white" : "text-slate-800"}`}
-                  >
-                    {item.title}
-                  </p>
-                  <p className="text-[10px] text-slate-400 font-medium">{item.type || item.location || 'Calendar'}</p>
-                </div>
+            {displayAgenda.length === 0 ? (
+              <div className="text-center py-8">
+                <span className="material-symbols-outlined text-slate-400 text-3xl">event_busy</span>
+                <p className="text-xs text-slate-450 font-bold mt-1.5">No events scheduled for today</p>
               </div>
-            ))}
+            ) : (
+              displayAgenda.map((item: any, idx: number) => (
+                <div
+                  key={idx}
+                  className="flex relative pl-5 animate-in fade-in slide-in-from-left-2 duration-300"
+                >
+                  <div
+                    className={`absolute left-0 top-[5px] w-2 h-2 rounded-full ${isDark ? (item.dotColorDark || 'bg-violet-500') : (item.dotColorLight || 'bg-purple-600')} shadow-[0_0_8px_rgba(124,58,237,0.3)]`}
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`text-[10px] font-bold ${isDark ? "text-violet-400" : "text-purple-600"}`}
+                      >
+                        {item.time}
+                      </span>
+                      {item.isFlight && (
+                        <span
+                          className={`material-symbols-outlined text-[14px] rotate-45 ${isDark ? "text-violet-400" : "text-purple-500"}`}
+                        >
+                          flight
+                        </span>
+                      )}
+                    </div>
+                    <p
+                      className={`text-xs font-bold mt-0.5 ${isDark ? "text-white" : "text-slate-800"}`}
+                    >
+                      {item.title}
+                    </p>
+                    <p className="text-[10px] text-slate-400 font-medium">{item.type || item.location || 'Calendar'}</p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </section>
 
@@ -508,7 +544,7 @@ export default function Dashboard({ setActivePage, isDark }: DashboardProps) {
           </div>
         </div>
         <div>
-          <span>© 2024 NeverLate AI</span>
+          <span>© {new Date().getFullYear()} NeverLate AI</span>
         </div>
       </footer>
     </div>
