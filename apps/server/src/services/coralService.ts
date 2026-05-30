@@ -132,6 +132,9 @@ export async function getRecentEmails(): Promise<Email[]> {
     coralCache.set(cacheKey, emails);
     return emails;
   } catch (error) {
+    if (process.env.CORAL_DEBUG === "true") {
+      throw error;
+    }
     console.log("Using fallback emails due to Coral execution failure.");
     return FALLBACK_EMAILS;
   }
@@ -173,6 +176,9 @@ export async function getUpcomingEvents(): Promise<CalendarEvent[]> {
     coralCache.set(cacheKey, events);
     return events;
   } catch (error) {
+    if (process.env.CORAL_DEBUG === "true") {
+      throw error;
+    }
     console.log("Using fallback events due to Coral execution failure.");
     return FALLBACK_EVENTS;
   }
