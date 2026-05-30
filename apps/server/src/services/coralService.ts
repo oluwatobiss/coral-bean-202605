@@ -74,20 +74,20 @@ export async function getRecentEmails(): Promise<Email[]> {
   try {
     const rawData = await runCoralCommand<any[]>("SELECT * FROM gmail.emails LIMIT 5");
 
-    console.log("=== Raw Coral Email Data ===");
-    console.log(rawData);
+    // console.log("=== Raw Coral Email Data ===");
+    // console.log(rawData);
 
     // Normalize Coral output to match our strict Email interface
     const emails: Email[] = await Promise.all(rawData.map(async (row) => {
       let snippet = row.snippet;
-      console.log("=== Raw Coral Email Data ===");
+      // console.log("=== Raw Coral Email Data ===");
       
       // If snippet is missing or null, fetch it from the message table
       if (!snippet && row.id) {
         try {
           const detail = await runCoralCommand<any[]>(`SELECT snippet, payload FROM gmail.message WHERE id = '${row.id}'`);
-          console.log("=== Raw Coral Email Data ===");
-          console.log(detail);
+          // console.log("=== Raw Coral Email Data ===");
+          // console.log(detail);
           if (detail && detail.length > 0) {
             if (detail[0].snippet) snippet = detail[0].snippet;
             
@@ -216,6 +216,27 @@ export async function verifyCoralSource(tableName: string): Promise<boolean> {
       return true;
     }
     return false;
+  }
+}
+
+export async function getCoralUserEmail(): Promise<string | null> {
+  const cacheKey = "coral_user_email";
+  const cached = coralCache.get<string>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const rawData = await runCoralCommand<any[]>(
+      "SELECT id FROM google_calendar.calendars WHERE primary = true LIMIT 1"
+    );
+    if (rawData && rawData.length > 0 && rawData[0].id) {
+      const email = rawData[0].id;
+      coralCache.set(cacheKey, email);
+      return email;
+    }
+    return null;
+  } catch (error) {
+    console.log("Failed to fetch Coral user email:", error);
+    return null;
   }
 }
 

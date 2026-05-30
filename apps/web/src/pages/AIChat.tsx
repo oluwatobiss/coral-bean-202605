@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { initialChatMessages, chatChips } from '../data/mockData'
+import { useSources } from '../context/SourcesContext'
 
 interface Message {
   sender: 'ai' | 'user'
@@ -15,6 +16,13 @@ interface AIChatProps {
 }
 
 export default function AIChat({ isDark }: AIChatProps) {
+  const { sources } = useSources()
+  const gmailSource = sources.find(s => s.id === 'gmail');
+  const userEmail = gmailSource?.email || 'alex@gmail.com';
+  const userName = userEmail !== 'alex@gmail.com' 
+    ? userEmail.split('@')[0].split(/[._-]/).map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ') 
+    : 'Alex';
+
   const [messages, setMessages] = useState<Message[]>(initialChatMessages)
   const [inputVal, setInputVal] = useState('')
   const [isTyping, setIsTyping] = useState(false)
@@ -89,7 +97,7 @@ export default function AIChat({ isDark }: AIChatProps) {
                   </div>
                 )}
                 <span className="text-[10px] font-bold uppercase tracking-wider">
-                  {isAI ? (msg.proactive ? 'Proactive Insight' : 'AI Agent') : 'Alex'} • {msg.time}
+                  {isAI ? (msg.proactive ? 'Proactive Insight' : 'AI Agent') : userName} • {msg.time}
                 </span>
               </div>
 

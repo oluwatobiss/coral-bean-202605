@@ -1,6 +1,7 @@
 
 
 import { useState, useEffect } from 'react'
+import { useSources } from '../context/SourcesContext'
 
 interface HeaderProps {
   activePage: string
@@ -10,6 +11,13 @@ interface HeaderProps {
 }
 
 export default function Header({ activePage, setActivePage, isDark, setIsDark }: HeaderProps) {
+  const { sources } = useSources();
+  const gmailSource = sources.find(s => s.id === 'gmail');
+  const userEmail = gmailSource?.email || 'alex@gmail.com';
+  const userName = userEmail !== 'alex@gmail.com' 
+    ? userEmail.split('@')[0].split(/[._-]/).map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ') 
+    : 'Alex';
+
   const [notifCount, setNotifCount] = useState(0)
 
   useEffect(() => {
@@ -110,18 +118,22 @@ export default function Header({ activePage, setActivePage, isDark, setIsDark }:
           <span className="material-symbols-outlined text-[20px]">history</span>
         </button>
 
-        {/* Avatar Profile */}
+        {/* Profile Info & Avatar */}
         <div 
           onClick={() => setActivePage('settings')}
-          className={`h-8 w-8 rounded-full overflow-hidden border cursor-pointer hover:scale-105 transition-transform ${
-            isDark ? 'border-violet-500/20' : 'border-purple-600/20'
-          }`}
+          className="flex items-center gap-3 cursor-pointer group hover:scale-[1.02] transition-transform animate-in fade-in duration-300"
         >
-          <img 
-            alt="User profile avatar" 
-            className="w-full h-full object-cover" 
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAdYiqAE0lXJpzGr9TKMsQWncjmKkz640A2J4d8fnR7rWHBreCi_LN1hwqtX2ApbdIqasFhJ2LsRMUyJkGs_C5sSOUm5YQUrRF00pKtrpGN2p8Ny9SZe7Ik61g1YI51iWO47cqCsURpYd1oV611D-m9UhknlH2DW0IjQjDm-8TSphpqGz43_xwC5ILc9Glz-OEBozqv_Arti2ZKPa7DjDW0XET4_N7mie7i3Gv484_HuhX5V0KL-nJialMAV-pZtTFaOwbkDUE7BYre"
-          />
+          <div className="hidden sm:flex flex-col text-right">
+            <span className={`text-xs font-bold leading-none ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>{userName}</span>
+            <span className="text-[9px] text-zinc-400 font-semibold mt-0.5">{userEmail}</span>
+          </div>
+          <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs shadow-inner transition-transform group-hover:scale-105 ${
+            isDark 
+              ? 'bg-gradient-to-tr from-violet-600 to-fuchsia-650 text-white border border-violet-500/30' 
+              : 'bg-gradient-to-tr from-purple-600 to-indigo-500 text-white border border-purple-500/30'
+          }`}>
+            {userName.charAt(0).toUpperCase()}
+          </div>
         </div>
       </div>
     </header>

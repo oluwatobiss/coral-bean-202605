@@ -24,6 +24,7 @@ export function SourcesProvider({ children }: { children: React.ReactNode }) {
             return {
               ...src,
               connected: statusObj.connected && statusObj.enabled,
+              email: statusObj.email || src.email,
               // Keep original connected flag just in case
               _coralConnected: statusObj.connected,
               _localEnabled: statusObj.enabled,
@@ -75,7 +76,14 @@ export function SourcesProvider({ children }: { children: React.ReactNode }) {
           const data = await res.json();
           if (data.success && data.connected) {
             setSources(prev => prev.map(src => 
-              src.id === id ? { ...src, connected: true, _coralConnected: true, _localEnabled: true, lastSync: 'Just now' } : src
+              src.id === id ? { 
+                ...src, 
+                connected: true, 
+                _coralConnected: true, 
+                _localEnabled: true, 
+                lastSync: 'Just now',
+                email: data.email || src.email
+              } : src
             ))
           } else {
             alert(data.error || "Source not found in Coral. Please configure the CLI.");

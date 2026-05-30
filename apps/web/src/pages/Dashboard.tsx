@@ -15,6 +15,12 @@ export default function Dashboard({ setActivePage, isDark }: DashboardProps) {
   const { sources } = useSources();
   const connectedSources = sources.filter(s => s.connected);
 
+  const gmailSource = sources.find(s => s.id === 'gmail');
+  const userEmail = gmailSource?.email || 'alex@gmail.com';
+  const userName = userEmail !== 'alex@gmail.com' 
+    ? userEmail.split('@')[0].split(/[._-]/).map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ') 
+    : 'Alex';
+
   const { data, loading } = useFetchWithFallback('http://localhost:3000/api/ai/dashboard', {
     metrics: dashboardKpis,
     insights: dashboardInsights,
@@ -50,7 +56,7 @@ export default function Dashboard({ setActivePage, isDark }: DashboardProps) {
       {/* Welcome Header */}
       <div className="col-span-12 mb-4">
         <h2 className={`text-3xl font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
-          Good morning, Alex! 👋
+          Good morning, {userName}! 👋
         </h2>
         <p className={`${isDark ? "text-zinc-500" : "text-slate-500"} mt-1 text-sm font-medium`}>
           Here's what's important today.
