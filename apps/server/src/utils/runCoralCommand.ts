@@ -5,9 +5,14 @@ import os from "os";
 const execAsync = promisify(exec);
 
 export async function runCoralCommand<T>(query: string): Promise<T> {
+  // If MOCK_MODE is true, immediately throw an error to force fallback to mock data
+  if (process.env.MOCK_MODE === "true") {
+    throw new Error("MOCK_MODE enabled - bypassing Coral execution.");
+  }
+
   const isWindows = process.platform === "win32";
   const distro = process.env.WSL_DISTRO || "Ubuntu";
-  const user = process.env.WSL_USER || "shazil_parwez";
+  const user = process.env.WSL_USER || "alex";
 
   const defaultCoralBin = isWindows
     ? `/home/${user}/.local/bin/coral`

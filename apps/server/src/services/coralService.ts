@@ -218,10 +218,11 @@ export async function verifyCoralSource(tableName: string): Promise<boolean> {
     
     // For demo/fallback purposes when coral CLI is entirely missing, we assume true if fallback is needed,
     // but the strict architecture requires returning false. Since the user wants to see "Connect" and "Disable" 
-    // functionality locally, we will mock the return for the demo if the error is "spawn coral ENOENT" or "not recognized".
+    // functionality locally, we will mock the return for the demo if the error is "spawn coral ENOENT" or "not recognized"
+    // or if MOCK_MODE is explicitly enabled.
     const errStr = String(error);
-    if (errStr.includes("ENOENT") || errStr.includes("not found") || errStr.includes("not recognized")) {
-      console.warn("Coral CLI not found locally. MOCKING verification to TRUE for hackathon UI testing.");
+    if (process.env.MOCK_MODE === "true" || errStr.includes("ENOENT") || errStr.includes("not found") || errStr.includes("not recognized")) {
+      console.warn("Coral CLI not found locally or MOCK_MODE enabled. MOCKING verification to TRUE for hackathon UI testing.");
       return true;
     }
     return false;
